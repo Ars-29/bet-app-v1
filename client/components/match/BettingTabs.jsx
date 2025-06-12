@@ -266,15 +266,17 @@ const BettingTabs = () => {
                 <div className="mb-4 sm:mb-6 bg-white pb-2 pl-2 sm:pl-[13px] p-1">
                     <div className="relative flex items-center">
                         {/* Left scroll button - Always visible */}
-                        <button
-                            onClick={scrollLeft}
-                            className={`absolute left-0 z-10 flex items-center justify-center w-8 h-8   transition-all duration-200 hover:bg-gray-50 text-black cursor-pointer`}
 
-
-                            disabled={!canScrollLeft}
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
+                        {
+                            canScrollLeft && (
+                                <button
+                                    onClick={scrollLeft}
+                                    className={`absolute left-0 z-10 flex hover:bg-gray-100 items-center justify-center w-8 h-8 bg-white transition-all duration-200  text-black cursor-pointer`}
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                            )
+                        }
 
                         {/* Scrollable tabs area */}
                         <div className="overflow-hidden w-fit mx-8">
@@ -288,7 +290,7 @@ const BettingTabs = () => {
                                         <button
                                             key={tab.id}
                                             onClick={() => setSelectedTab(tab.id)}
-                                            className={`px-2 py-1.5 sm:px-3 sm:py-1 text-xs rounded-2xl sm:rounded-3xl whitespace-nowrap transition-all duration-200 flex-shrink-0 ${selectedTab === tab.id
+                                            className={`px-2 py-1.5 sm:px-3 sm:py-1 cursor-pointer text-xs rounded-2xl sm:rounded-3xl whitespace-nowrap transition-all duration-200 flex-shrink-0 ${selectedTab === tab.id
                                                 ? "bg-base text-white "
                                                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                                                 }`}
@@ -301,13 +303,18 @@ const BettingTabs = () => {
                         </div>
 
                         {/* Right scroll button - Always visible */}
-                        <button
-                            onClick={scrollRight}
-                            className={`absolute right-0 z-10 flex items-center justify-center w-8 h-8 bg-white  transition-all duration-200 hover:bg-gray-50 text-black cursor-pointer`}
-                            disabled={!canScrollRight}
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
+                        {
+                            canScrollRight && (
+                                <button
+                                    onClick={scrollRight}
+                                    className={`absolute right-0 z-10 flex items-center justify-center w-8 h-8 bg-white  transition-all duration-200 hover:bg-gray-100 text-black cursor-pointer`}
+                                    disabled={!canScrollRight}
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            )
+                        }
+
                     </div>
                 </div>
                 <TabsContent value="all" className="space-y-3">

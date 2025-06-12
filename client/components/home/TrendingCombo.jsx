@@ -35,7 +35,7 @@ const TrendingCombo = () => {
     return (
         <div className="space-y-4">
             {/* Live Stream Promo */}
-            <Card className="bg-gradient-to-r from-green-600 to-blue-600 text-white">
+            <Card className="bg-gradient-to-r rounded-none shadow-none from-green-600 to-blue-600 text-white">
                 <CardContent className="p-6">
                     <h3 className="font-bold mb-2">Live stream football, tennis and all the biggest events</h3>
                     <p className="text-sm mb-4">18+. Terms and Conditions apply.</p>
@@ -46,7 +46,7 @@ const TrendingCombo = () => {
             </Card>
 
             {/* Trending Combo */}
-            <Card>
+            <Card className="shadow-none rounded-none">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <h3 className="font-bold">Trending Combo</h3>

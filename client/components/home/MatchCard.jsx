@@ -3,12 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const MatchCard = ({ match }) => {
     return (
         <Link href={`/matches/${match.id}`}>
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4">
+            <div className=" bg-white border border-gray-200 cursor-pointer rounded-none shadow-none">
+                <div className="p-4">
                     <div className="text-xs text-gray-500 mb-2">{match.tournament}</div>
 
                     <div className="flex justify-between items-start mb-3">
@@ -23,30 +24,54 @@ const MatchCard = ({ match }) => {
                             </div>
                             <div>{match.time}</div>
                         </div>
-                    </div>
-
-                    <div className="flex gap-1">
+                    </div>                    <div className="flex gap-1">
                         {match.odds['1'] && (
-                            <div className="flex-1 bg-green-600 text-white text-center py-2 text-sm font-medium rounded-sm">
-                                <div className="text-xs">1</div>
-                                <div>{match.odds['1']}</div>
-                            </div>
+                            <Button
+                                size={"sm"}
+                                className="flex-1 flex justify-between py-2 gap-0"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    console.log('Selected odds: 1 -', match.odds['1']);
+                                }}
+                            >
+                                <div className="text-[11px]">1</div>
+                                <div className='text-[13px]  font-bold'>{match.odds['1']}</div>
+                            </Button>
                         )}
                         {match.odds['X'] && (
-                            <div className="flex-1 bg-green-600 text-white text-center py-2 text-sm font-medium rounded-sm">
-                                <div className="text-xs">X</div>
-                                <div>{match.odds['X']}</div>
-                            </div>
+                            <Button
+                                className="flex-1 flex justify-between py-2  gap-0"
+                                size={"sm"}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    // Handle odds selection logic here
+                                    console.log('Selected odds: X -', match.odds['X']);
+                                }}
+                            >
+                                <div className="text-[11px]">X</div>
+                                <div className='text-[13px] font-bold'>{match.odds['X']}</div>
+                            </Button>
                         )}
                         {match.odds['2'] && (
-                            <div className="flex-1 bg-green-600 text-white text-center py-2 text-sm font-medium rounded-sm">
-                                <div className="text-xs">2</div>
-                                <div>{match.odds['2']}</div>
-                            </div>
+                            <Button
+                                size={"sm"}
+                                className="flex-1 flex justify-between py-2  gap-0"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    // Handle odds selection logic here
+                                    console.log('Selected odds: 2 -', match.odds['2']);
+                                }}
+                            >
+                                <div className="text-[11px]">2</div>
+                                <div className='text-[13px] font-bold'>{match.odds['2']}</div>
+                            </Button>
                         )}
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         </Link>
     );
 };

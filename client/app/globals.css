@@ -215,4 +215,14 @@
   .dropdown-scrollbar::-webkit-scrollbar-thumb:active {
     background: #d1d5db;
   } */
+
+  /* Hide scrollbar for league cards */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

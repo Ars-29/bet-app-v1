@@ -31,7 +31,7 @@ const BetBuilderHighlights = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {highlights.map((highlight, index) => (
-                    <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+                    <Card key={index} className="shadow-none rounded-none transition-shadow cursor-pointer">
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center">
