@@ -3,13 +3,13 @@ import { useRef, useState } from "react"
 import { ChevronLeft, ChevronDown, Clock } from "lucide-react"
 import MatchDropdown from "./MatchDropdown"
 import { allMatches } from "@/data/dummyMatches"
-
+import { useRouter } from "next/navigation"
 const MatchHeader = ({ matchId }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false)
     const triggetRef = useRef(null)
     const currentMatch = allMatches.find(match => match.id === matchId)
     const match = currentMatch || allMatches[0]
-
+    const router = useRouter()
     const toggleDropdown = () => {
         setIsDropdownOpen(!isDropdownOpen)
     }
@@ -21,10 +21,12 @@ const MatchHeader = ({ matchId }) => {
     return (
         <div className="mb-4 bg-white p-3">
             {/* Breadcrumb */}
-            <div className="flex items-center text-xs text-slate-500 mb-3">
+            <button
+                onClick={() => { router.back() }}
+                className="flex cursor-pointer items-center text-xs text-slate-500 mb-3 hover:text-slate-600 transition-all" >
                 <ChevronLeft className="h-4 w-4" />
                 <span className="ml-1 truncate">Football | {match.competition}</span>
-            </div>
+            </button>
 
             {/* Match Header */}
             <div className="relative">
@@ -41,7 +43,7 @@ const MatchHeader = ({ matchId }) => {
                                     color={match.homeTeam.jerseyColor}
                                 />
                                 <span className="text-base font-medium">{match.homeTeam.name}</span>
-                                <span className="text-base text-slate-400">vs</span>
+                                <span className=" text-slate-400">vs</span>
                                 <span className="text-base font-medium">{match.awayTeam.name}</span>
                                 <TeamBadge
                                     country={match.awayTeam.shortName}

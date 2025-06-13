@@ -1,22 +1,31 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const SidebarContext = createContext();
 
 export const SidebarProvider = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Use useCallback to ensure stable function references
   const handleSetIsCollapsed = useCallback((value) => {
-    console.log("Setting isCollapsed to:", value);
     setIsCollapsed(value);
   }, []);
 
   const handleSetIsPinned = useCallback((value) => {
-    console.log("Setting isPinned to:", value);
     setIsPinned(value);
+  }, []);
+
+  const handleSetIsMobileOpen = useCallback((value) => {
+    setIsMobileOpen(value);
+  }, []);
+
+  const toggleMobileSidebar = useCallback(() => {
+    setIsMobileOpen((prev) => !prev);
   }, []);
 
   const contextValue = {
@@ -24,6 +33,10 @@ export const SidebarProvider = ({ children }) => {
     setIsCollapsed: handleSetIsCollapsed,
     isPinned,
     setIsPinned: handleSetIsPinned,
+    isMobileOpen,
+    setIsMobileOpen: handleSetIsMobileOpen,
+    toggleMobileSidebar,
+    isMobile,
   };
 
   return (

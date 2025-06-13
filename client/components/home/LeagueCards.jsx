@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import leaguesData from '@/data/dummayLeagues';
+import leaguesData, { getLiveLeagues } from '@/data/dummayLeagues';
 // League Card Component
-const LeagueCard = ({ league }) => {
+const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
     return (
         <div className="bg-white border border-gray-200 rounded-none shadow-none mb-4 h-[495px] flex flex-col">
             {/* League Header */}
@@ -20,14 +20,12 @@ const LeagueCard = ({ league }) => {
                         </div>
                     </div>
                     <div className="text-xs text-gray-500">
-                        {league.day}
+                        {isInPlay ? league.day : league.day}
                     </div>
                 </div>
-            </div>
-
-            {/* Odds Header */}
+            </div>            {/* Odds Header */}
             <div className="flex items-center px-4 py-2 bg-gray-100 border-b border-gray-200 flex-shrink-0">
-                <div className="flex-1 text-xs">Today</div>
+                <div className="flex-1 text-xs">{isInPlay ? 'Today' : 'Today'}</div>
                 <div className="flex gap-1">
                     <div className="w-14 text-center text-xs text-gray-600 font-medium">1</div>
                     <div className="w-14 text-center text-xs text-gray-600 font-medium">X</div>
@@ -37,27 +35,43 @@ const LeagueCard = ({ league }) => {
 
             {/* Matches */}
             <div className="p-4 py-0 flex-1 overflow-y-auto">
-                {league.matches.slice(0, 4).map((match, index) => (
-
-                    <div key={match.id}>
-                        <div className='flex justify-between mt-2  '>
-                            <div className=" text-xs text-gray-600">21:00</div>
-                            <div className=" text-xs text-gray-500">+358</div>
+                {league.matches.slice(0, 4).map((match, index) => (<div key={match.id}>
+                    <div className='flex justify-between mt-2  '>
+                        <div className=" text-xs text-gray-600">
+                            {isInPlay ? (match.liveTime || '45:32') : '21:00'}
                         </div>
-                        <Link href={`/matches/${match.id}`}>
-                            <div className="cursor-pointer hover:bg-gray-50 -mx-4 px-4 py-1 rounded">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <div className="text-[12px] mb-1" title={match.team1}>
+                        <div className=" text-xs text-gray-500">
+                            {isInPlay ? '' : '+358'}
+                        </div>
+                    </div>
+                    <Link href={`/matches/${match.id}`}>
+                        <div className="cursor-pointer hover:bg-gray-50 -mx-4 px-4 py-1 rounded">
+                            <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                    <div className="text-[12px] mb-1 flex items-center gap-2" title={match.team1}>
+                                        {isInPlay && (
+                                            <span className="text-xs font-bold text-gray-900 min-w-[16px]">
+                                                {match.score?.team1 || '0'}
+                                            </span>
+                                        )}
+                                        <span>
                                             {match.team1.length > 6 ? `${match.team1.slice(0, 18)}...` : match.team1}
-                                        </div>
-                                        <div className="text-[12px]" title={match.team2}>
-                                            {match.team2.length > 6 ? `${match.team2.slice(0, 18)}...` : match.team2}
-                                        </div>
+                                        </span>
                                     </div>
+                                    <div className="text-[12px] flex items-center gap-2" title={match.team2}>
+                                        {isInPlay && (
+                                            <span className="text-xs font-bold text-gray-900 min-w-[16px]">
+                                                {match.score?.team2 || '0'}
+                                            </span>
+                                        )}
+                                        <span>
+                                            {match.team2.length > 6 ? `${match.team2.slice(0, 18)}...` : match.team2}
+                                        </span>
+                                    </div>
+                                </div>
 
-                                    <div className="flex items-center  flex-shrink-0">
-                                        {/* <div className="text-right text-xs text-gray-500">
+                                <div className="flex items-center  flex-shrink-0">
+                                    {/* <div className="text-right text-xs text-gray-500">
                                             <div className="flex items-center gap-1">
                                                 {match.clock && <span>⏰</span>}
                                                 <span>{match.time}</span>
@@ -66,73 +80,83 @@ const LeagueCard = ({ league }) => {
                                                 <div className="text-red-500 font-medium">LIVE</div>
                                             )}
                                         </div> */}
-                                        <div className="flex gap-1">
-                                            {match.odds['1'] && (
-                                                <Button
-                                                    size={"sm"}
-                                                    className="w-14 h-8 p-0 text-xs font-bold"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        console.log('Selected odds: 1 -', match.odds['1']);
-                                                    }}
-                                                >
-                                                    {match.odds['1']}
-                                                </Button>
-                                            )}
-                                            {match.odds['X'] && (
-                                                <Button
-                                                    className="w-14 h-8 p-0 text-xs font-bold"
-                                                    size={"sm"}
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        console.log('Selected odds: X -', match.odds['X']);
-                                                    }}
-                                                >
-                                                    {match.odds['X']}
-                                                </Button>
-                                            )}
-                                            {match.odds['2'] && (
-                                                <Button
-                                                    size={"sm"}
-                                                    className="w-14 h-8 p-0 text-xs font-bold"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        console.log('Selected odds: 2 -', match.odds['2']);
-                                                    }}
-                                                >
-                                                    {match.odds['2']}
-                                                </Button>
-                                            )}
-                                        </div>
+                                    <div className="flex gap-1">
+                                        {match.odds['1'] && (
+                                            <Button
+                                                size={"sm"}
+                                                className="w-14 h-8 p-0 text-xs font-bold"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    console.log('Selected odds: 1 -', match.odds['1']);
+                                                }}
+                                            >
+                                                {match.odds['1']}
+                                            </Button>
+                                        )}
+                                        {match.odds['X'] && (
+                                            <Button
+                                                className="w-14 h-8 p-0 text-xs font-bold"
+                                                size={"sm"}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    console.log('Selected odds: X -', match.odds['X']);
+                                                }}
+                                            >
+                                                {match.odds['X']}
+                                            </Button>
+                                        )}
+                                        {match.odds['2'] && (
+                                            <Button
+                                                size={"sm"}
+                                                className="w-14 h-8 p-0 text-xs font-bold"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    console.log('Selected odds: 2 -', match.odds['2']);
+                                                }}
+                                            >
+                                                {match.odds['2']}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
-                            </div>                        </Link>
-                        {index < Math.min(league.matches.length, 4) - 1 && (
-                            <div className="border-b border-gray-300 mx-0 my-2"></div>
-                        )}
-                    </div>
+                            </div>
+                        </div>                        </Link>
+                    {index < Math.min(league.matches.length, 4) - 1 && (
+                        <div className="border-b border-gray-300 mx-0 my-2"></div>
+                    )}
+                </div>
                 ))}
-            </div>
-            {/* More Button */}
-
-            <div className="p-4 py-3 flex items-center justify-center font-medium border-t border-gray-200  flex-shrink-0">
-                <Link href={`/leagues/${league.id}`}
+            </div>            {/* More Button */}            <div className="p-4 py-3 flex items-center justify-center font-medium border-t border-gray-200  flex-shrink-0">
+                <Link href={isInPlay ? `/inplay` : `/leagues/${league.id}`}
                     variant="outline"
                     size="sm"
                     className="w-full text-base text-xs text-center "
                 >
-                    More {league.name}
+                    {viewAllText || (isInPlay ? 'View All Live Matches' : `More ${league.name}`)}
                 </Link>
             </div>
         </div>
     );
 };
 
-const LeagueCards = () => {
+const LeagueCards = ({
+    title = "Football Daily",
+    isInPlay = false,
+    showDayTabs = true,
+    viewAllText = null
+}) => {
     const scrollRef = useRef(null);
+
+    // Get appropriate data based on mode
+    const displayData = isInPlay ? getLiveLeagues() : leaguesData;
+
+    // If in-play mode and no live matches, don't render the component
+    if (isInPlay && displayData.length === 0) {
+        return null;
+    }
 
 
 
@@ -146,29 +170,31 @@ const LeagueCards = () => {
         if (scrollRef.current) {
             scrollRef.current.scrollBy({ left: 320, behavior: 'smooth' });
         }
-    };
-
-    return (
+    }; return (
         <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Football Daily</h2>
+            {title && (
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
+            )}
 
             {/* Day Tabs */}
-            <div className="flex gap-2 mb-6">
-                <Button
-                    size="sm"
-                    variant="default"
-                    className="bg-gray-200 text-gray-800 text-xs hover:bg-gray-300 rounded-full px-4"
-                >
-                    Today
-                </Button>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-gray-300 text-gray-600 text-xs hover:bg-gray-50 rounded-full px-4"
-                >
-                    Tomorrow
-                </Button>
-            </div>            {/* Carousel Navigation */}
+            {showDayTabs && (
+                <div className="flex gap-2 mb-6">
+                    <Button
+                        size="sm"
+                        variant="default"
+                        className="bg-gray-200 text-gray-800 text-xs hover:bg-gray-300 rounded-full px-4"
+                    >
+                        Today
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-gray-300 text-gray-600 text-xs hover:bg-gray-50 rounded-full px-4"
+                    >
+                        Tomorrow
+                    </Button>
+                </div>
+            )}{/* Carousel Navigation */}
             <div className="relative group">
                 <Button
                     variant="outline"
@@ -192,12 +218,15 @@ const LeagueCards = () => {
                 <div
                     ref={scrollRef}
                     className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide"
-                >
-                    {leaguesData.map((league) => (
-                        <div key={league.id} className="flex-shrink-0 w-96">
-                            <LeagueCard league={league} />
-                        </div>
-                    ))}
+                >                    {displayData.map((league) => (
+                    <div key={league.id} className="flex-shrink-0 w-96">
+                        <LeagueCard
+                            league={league}
+                            isInPlay={isInPlay}
+                            viewAllText={viewAllText}
+                        />
+                    </div>
+                ))}
                 </div>
             </div>
         </div>

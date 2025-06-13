@@ -86,7 +86,36 @@ const TopPicks = () => {
                 '2': '1.75'
             },
             clock: true
+        },
+        {
+            id: 'Pakistan-hungary',
+            tournament: 'International Friendly Matches',
+            team1: 'Azerbaijan',
+            team2: 'Hungary',
+            date: '10 Jun',
+            time: 'Today 21:00',
+            odds: {
+                '1': '4.90',
+                'X': '3.55',
+                '2': '1.75'
+            },
+            clock: true
+        },
+        {
+            id: 'India-hungary',
+            tournament: 'International Friendly Matches',
+            team1: 'Azerbaijan',
+            team2: 'Hungary',
+            date: '10 Jun',
+            time: 'Today 21:00',
+            odds: {
+                '1': '4.90',
+                'X': '3.55',
+                '2': '1.75'
+            },
+            clock: true
         }
+
     ];
 
     return (
@@ -96,7 +125,7 @@ const TopPicks = () => {
                 <Link href="#" className="text-green-600 hover:underline text-sm">View All</Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {matches.map((match) => (
                     <MatchCard key={match.id} match={match} />
                 ))}

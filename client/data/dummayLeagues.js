@@ -14,6 +14,8 @@ const leaguesData = [
         odds: { 1: "2.06", X: "3.35", 2: "2.70" },
         isLive: true,
         clock: true,
+        liveTime: "02:55",
+        score: { team1: "1", team2: "0" },
       },
       {
         id: 102,
@@ -24,6 +26,8 @@ const leaguesData = [
         odds: { 1: "2.60", X: "5.60", 2: "1.75" },
         isLive: true,
         clock: true,
+        liveTime: "00:17",
+        score: { team1: "0", team2: "0" },
       },
       {
         id: 103,
@@ -142,9 +146,12 @@ const leaguesData = [
         odds: { 1: "2.20", X: "3.25", 2: "3.10" },
         isLive: true,
         clock: true,
+        liveTime: "45:32",
+        score: { team1: "1", team2: "2" },
       },
     ],
-  },  {
+  },
+  {
     id: 4,
     name: "Premier League",
     icon: "🏆",
@@ -157,8 +164,10 @@ const leaguesData = [
         team1: "Manchester United",
         team2: "Liverpool",
         odds: { 1: "2.10", X: "3.40", 2: "3.20" },
-        isLive: false,
+        isLive: true,
         clock: false,
+        liveTime: "67:23",
+        score: { team1: "2", team2: "1" },
       },
       {
         id: 402,
@@ -195,8 +204,10 @@ const leaguesData = [
         team1: "Real Madrid",
         team2: "Barcelona",
         odds: { 1: "2.30", X: "3.20", 2: "2.90" },
-        isLive: false,
+        isLive: true,
         clock: false,
+        liveTime: "89:15",
+        score: { team1: "3", team2: "1" },
       },
       {
         id: 502,
@@ -238,6 +249,234 @@ const leaguesData = [
       },
     ],
   },
+  {
+    id: 7,
+    name: "Serie A",
+    icon: "🇮🇹",
+    day: "Today",
+    matches: [
+      {
+        id: 701,
+        time: "15:00",
+        day: "Today",
+        team1: "Juventus",
+        team2: "AC Milan",
+        odds: { 1: "2.15", X: "3.25", 2: "3.10" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 702,
+        time: "17:30",
+        day: "Today",
+        team1: "Inter Milan",
+        team2: "Napoli",
+        odds: { 1: "2.40", X: "3.00", 2: "2.90" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 703,
+        time: "20:00",
+        day: "Today",
+        team1: "AS Roma",
+        team2: "Lazio",
+        odds: { 1: "2.05", X: "3.40", 2: "3.50" },
+        isLive: false,
+        clock: false,
+      },
+    ],
+  },
+  {
+    id: 8,
+    name: "Ligue 1",
+    icon: "🇫🇷",
+    day: "Today",
+    matches: [
+      {
+        id: 801,
+        time: "16:00",
+        day: "Today",
+        team1: "Paris Saint-Germain",
+        team2: "Olympique Marseille",
+        odds: { 1: "1.70", X: "3.80", 2: "4.50" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 802,
+        time: "18:00",
+        day: "Today",
+        team1: "AS Monaco",
+        team2: "Lyon",
+        odds: { 1: "2.25", X: "3.20", 2: "3.00" },
+        isLive: false,
+        clock: false,
+      },
+    ],
+  },
+  {
+    id: 9,
+    name: "Champions League",
+    icon: "🏆",
+    day: "Today",
+    matches: [
+      {
+        id: 901,
+        time: "21:00",
+        day: "Today",
+        team1: "Real Madrid",
+        team2: "Manchester City",
+        odds: { 1: "2.50", X: "3.10", 2: "2.70" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 902,
+        time: "21:00",
+        day: "Today",
+        team1: "Barcelona",
+        team2: "Bayern Munich",
+        odds: { 1: "2.80", X: "3.25", 2: "2.45" },
+        isLive: false,
+        clock: false,
+      },
+    ],
+  },
+  {
+    id: 10,
+    name: "Europa League",
+    icon: "🏅",
+    day: "Today",
+    matches: [
+      {
+        id: 1001,
+        time: "19:00",
+        day: "Today",
+        team1: "Arsenal",
+        team2: "Atletico Madrid",
+        odds: { 1: "2.10", X: "3.30", 2: "3.20" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 1002,
+        time: "19:00",
+        day: "Today",
+        team1: "Sevilla",
+        team2: "Borussia Dortmund",
+        odds: { 1: "2.60", X: "3.15", 2: "2.65" },
+        isLive: false,
+        clock: false,
+      },
+    ],
+  },
+  {
+    id: 11,
+    name: "MLS",
+    icon: "🇺🇸",
+    day: "Today",
+    matches: [
+      {
+        id: 1101,
+        time: "22:30",
+        day: "Today",
+        team1: "LA Galaxy",
+        team2: "Seattle Sounders",
+        odds: { 1: "2.30", X: "3.25", 2: "2.95" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 1102,
+        time: "23:00",
+        day: "Today",
+        team1: "Inter Miami",
+        team2: "New York City FC",
+        odds: { 1: "1.95", X: "3.40", 2: "3.60" },
+        isLive: false,
+        clock: false,
+      },
+    ],
+  },
+  {
+    id: 12,
+    name: "Championship",
+    icon: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    day: "Today",
+    matches: [
+      {
+        id: 1201,
+        time: "15:00",
+        day: "Today",
+        team1: "Leeds United",
+        team2: "Leicester City",
+        odds: { 1: "2.20", X: "3.20", 2: "3.10" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 1202,
+        time: "17:30",
+        day: "Today",
+        team1: "Norwich City",
+        team2: "West Bromwich Albion",
+        odds: { 1: "2.45", X: "3.05", 2: "2.85" },
+        isLive: false,
+        clock: false,
+      },
+      {
+        id: 1203,
+        time: "20:00",
+        day: "Today",
+        team1: "Sheffield United",
+        team2: "Burnley",
+        odds: { 1: "2.65", X: "3.10", 2: "2.60" },
+        isLive: false,
+        clock: false,
+      },
+    ],
+  },
 ];
+
+// Function to get only live matches
+export const getLiveLeagues = () => {
+  return leaguesData
+    .map((league) => ({
+      ...league,
+      matches: league.matches.filter((match) => match.isLive),
+    }))
+    .filter((league) => league.matches.length > 0);
+};
+
+// Function to get only upcoming (non-live) matches
+export const getUpcomingLeagues = () => {
+  return leaguesData
+    .map((league) => ({
+      ...league,
+      matches: league.matches
+        .filter((match) => !match.isLive)
+        .map((match) => ({
+          ...match,
+          startTime: match.time, // Add startTime property for upcoming matches
+        })),
+    }))
+    .filter((league) => league.matches.length > 0);
+};
+
+// Function to get only today's upcoming matches
+export const getTodaysUpcomingLeagues = () => {
+  return leaguesData
+    .map((league) => ({
+      ...league,
+      matches: league.matches
+        .filter((match) => !match.isLive && match.day === "Today")
+        .map((match) => ({
+          ...match,
+          startTime: match.time, // Add startTime property for upcoming matches
+        })),
+    }))
+    .filter((league) => league.matches.length > 0);
+};
 
 export default leaguesData;

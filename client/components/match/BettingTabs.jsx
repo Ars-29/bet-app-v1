@@ -5,6 +5,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
+import { Button } from "../ui/button"
 
 // Dynamic market categorization based on market types and keywords
 const categorizeMarkets = (markets, tabs) => {
@@ -135,7 +136,7 @@ const BettingTabs = () => {
         }
     }, [])
 
-    // Scroll functions
+    //INFO: Scroll functions
     const scrollLeft = () => {
         const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
         if (scrollElement) {
@@ -148,7 +149,8 @@ const BettingTabs = () => {
         if (scrollElement) {
             scrollElement.scrollBy({ left: 200, behavior: 'smooth' })
         }
-    }    // Listen for scroll events
+    }
+    // Listen for scroll events
     useEffect(() => {
         const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
         if (scrollElement) {
@@ -287,16 +289,16 @@ const BettingTabs = () => {
                             >
                                 <div className="flex gap-1 sm:gap-1.5 min-w-max pr-4">
                                     {tabs.map((tab) => (
-                                        <button
+                                        <Button
                                             key={tab.id}
                                             onClick={() => setSelectedTab(tab.id)}
-                                            className={`px-2 py-1.5 sm:px-3 sm:py-1 cursor-pointer text-xs rounded-2xl sm:rounded-3xl whitespace-nowrap transition-all duration-200 flex-shrink-0 ${selectedTab === tab.id
+                                            className={`px-2 py-1.5 sm:px-3 sm:py-1 font-normal cursor-pointer text-xs rounded-2xl sm:rounded-3xl whitespace-nowrap transition-all duration-200 flex-shrink-0 ${selectedTab === tab.id
                                                 ? "bg-base text-white "
-                                                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                                                : "text-gray-600 hover:text-gray-900 bg-white  hover:bg-gray-100"
                                                 }`}
                                         >
                                             {tab.label}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             </ScrollArea>
@@ -486,9 +488,9 @@ const BettingOptionsTable = ({ options }) => {
 // Compact Betting Option - Professional and Sleek
 const BettingOptionCompact = ({ label, odds }) => {
     return (
-        <button className="group relative bg-emerald-600 px-2 py-1 text-center transition-all duration-200 active:scale-[0.98] ">
+        <Button className="group relative  px-2 py-1 text-center transition-all duration-200 active:scale-[0.98] ">
             {/* Content */}
-            <div className="relative flex justify-between py-1  z-10">
+            <div className="relative w-full flex justify-between py-1  z-10">
                 <div className="text-[12px] text-white font-medium mb-0.5 transition-colors duration-200 leading-tight">
                     {label}
                 </div>
@@ -496,7 +498,7 @@ const BettingOptionCompact = ({ label, odds }) => {
                     {odds}
                 </div>
             </div>
-        </button>
+        </Button>
     )
 }
 

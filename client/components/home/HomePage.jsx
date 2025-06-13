@@ -13,14 +13,24 @@ const HomePage = () => {
                 <div className="flex flex-col xl:flex-row gap-4 lg:gap-6">                    {/* Main content area */}
                     <div className="flex-1 min-w-0">
                         <TopPicks />
-                        <BetBuilderHighlights />
+                        {/* <BetBuilderHighlights /> */}
+
+                        {/* Regular League Cards */}
                         <LeagueCards />
+                        {/* In-Play Section */}
+                        <LeagueCards
+                            title="In-Play"
+                            isInPlay={true}
+                            showDayTabs={false}
+                            viewAllText="View All Live Football"
+                        />
+
                     </div>
 
                     {/* Right sidebar */}
-                    <div className="w-full xl:w-80 xl:flex-shrink-0">
+                    {/* <div className="w-full xl:w-80 xl:flex-shrink-0">
                         <TrendingCombo />
-                    </div>
+                    </div> */}
                 </div>
             </div>
         </div>

@@ -3,13 +3,14 @@ import React, { useRef, useState } from 'react';
 import { ChevronLeft, ChevronDown, Clock } from "lucide-react";
 import LeagueDropdown from "./LeagueDropdown";
 import leaguesData from "@/data/dummayLeagues";
+import { useRouter } from 'next/navigation';
 
 const LeagueHeader = ({ leagueId }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const triggerRef = useRef(null);
     const currentLeague = leaguesData.find(league => league.id === parseInt(leagueId));
     const league = currentLeague || leaguesData[0];
-
+    const router = useRouter();
     const toggleDropdown = () => {
         setIsDropdownOpen(!isDropdownOpen);
     };
@@ -21,10 +22,11 @@ const LeagueHeader = ({ leagueId }) => {
     return (
         <div className="mb-4 bg-white p-3 w-screen">
             {/* Breadcrumb */}
-            <div className="flex items-center text-xs text-slate-500 mb-3">
+            <button className="flex cursor-pointer items-center text-xs text-slate-500 hover:text-slate-600 transition-all mb-3" onClick={() => router.back()}
+            >
                 <ChevronLeft className="h-4 w-4" />
                 <span className="ml-1 truncate">Football | {league.name}</span>
-            </div>
+            </button>
 
             {/* League Header */}
             <div className="relative">

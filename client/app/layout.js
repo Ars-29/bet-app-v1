@@ -21,7 +21,7 @@ export default function RootLayout({ children }) {
         <ReduxProvider>
           <SidebarProvider>
             <div className=" bg-gray-100">
-              {/* Header - Not Fixed */}
+              {/* INFO: Header- */}
               <div>
                 <Header />
               </div>

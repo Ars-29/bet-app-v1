@@ -28,7 +28,7 @@ const MatchCard = ({ match }) => {
                         {match.odds['1'] && (
                             <Button
                                 size={"sm"}
-                                className="flex-1 flex justify-between py-2 gap-0"
+                                className="flex-1 flex justify-between py-2 gap-0 "
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
