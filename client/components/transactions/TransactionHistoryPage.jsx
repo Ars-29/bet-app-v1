@@ -131,34 +131,32 @@ const TransactionHistoryPage = () => {
 
   return (
     <div className="flex-1 bg-gray-100">
-      <div className="p-3 lg:p-6 space-y-6">        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="p-3 lg:p-6 space-y-6">        {/* Header */}        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Transaction History</h1>
-            <p className="text-gray-600 mt-1">View all your financial transactions</p>
+            <p className="text-gray-600 mt-1 text-sm">View all your financial transactions</p>
           </div>
-        </div>        {/* Filters */}
-        <Card className={"rounded-none shadow-none py-3"}>
+        </div>{/* Filters */}
+        <Card className={"rounded-none shadow-none py-3 text-xs"}>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2 !text-lg text-base">
                 <Filter className="h-4 w-4" />
                 Filters
               </CardTitle>
               <Button
+                className={"py-1 px-4"}
                 variant="outline"
-                size="sm"
                 onClick={() => dispatch(resetFilters())}
               >
                 Clear Filters
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardContent>            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Type Filter */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Type</label>
+                <label className="font-medium ml-1 mt-1 text-gray-700">Type</label>
                 <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="All types" />
@@ -174,16 +172,14 @@ const TransactionHistoryPage = () => {
 
               {/* Date Range */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Date From</label>
+                <label className=" font-medium text-gray-700">Date From</label>
                 <Input
                   type="date"
                   value={filters.dateFrom}
                   onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Date To</label>
+              </div>              <div className="space-y-2">
+                <label className=" font-medium text-gray-700">Date To</label>
                 <Input
                   type="date"
                   value={filters.dateTo}
@@ -257,10 +253,9 @@ const TransactionHistoryPage = () => {
                   </TableHeader>
                   <TableBody>
                     {sortedData.map((item) => {
-                      const { date, time } = formatDateTime(item.dateTime);
-                      return (
-                        <TableRow key={item.id} className="hover:bg-gray-50">
-                          <TableCell className="font-mono text-sm">{item.id}</TableCell>
+                      const { date, time } = formatDateTime(item.dateTime);                      return (
+                        <TableRow key={item.id} className="hover:bg-gray-50 text-[13px]">
+                          <TableCell className="font-mono ">{item.id}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {getTypeIcon(item.type)}
@@ -269,7 +264,7 @@ const TransactionHistoryPage = () => {
                           </TableCell>
                           <TableCell>{formatAmount(item.amount)}</TableCell>
                           <TableCell>
-                            <div className="text-sm">
+                            <div className="">
                               <div className="">{date}</div>
                               <div className="text-gray-500">{time}</div>
                             </div>

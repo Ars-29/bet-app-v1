@@ -153,13 +153,14 @@ const BettingHistoryPage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Betting History</h1>
-            <p className="text-gray-600 mt-1">View all your betting activity</p>
+            <p className="text-gray-600 mt-1 text-sm">View all your betting activity</p>
           </div>
-        </div>        {/* Filters */}
-        <Card className={"rounded-none shadow-none py-3"}>
+        </div>        
+        {/* Filters */}
+        <Card className={"rounded-none shadow-none py-3 text-xs"}>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2 !text-lg text-base ">
                 <Filter className="h-4 w-4" />
                 Filters
               </CardTitle>
@@ -176,40 +177,48 @@ const BettingHistoryPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Type Filter */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Bet Type</label>
-                <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
+                <label className="font-medium ml-1 mt-1 text-gray-700">Bet Type</label>
+                <Select value={filters.type} 
+                
+                onValueChange={(value) => handleFilterChange('type', value)}
+                
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="All types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="all" >All Types</SelectItem>
                     <SelectItem value="single">Single Bet</SelectItem>
                     <SelectItem value="accumulator">Accumulator</SelectItem>
                     <SelectItem value="system">System Bet</SelectItem>
                   </SelectContent>
-                </Select>              </div>
+                </Select>              
+                </div>
 
               {/* Date Range */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Date From</label>
+                <label className=" font-medium text-gray-700">Date From</label>
                 <Input
                   type="date"
                   value={filters.dateFrom}
                   onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                  className={"h-9"}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Date To</label>
+                <label className=" font-medium text-gray-700">Date To</label>
                 <Input
                   type="date"
                   value={filters.dateTo}
                   onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                  className={"h-9 "}
                 />
-              </div>            </div>
+              </div>            
+              </div>
             
             <div className="flex justify-start items-center mt-4 pt-4 border-t">
-              <div className="text-sm text-gray-600">
+              <div className=" text-gray-600">
                 Showing {sortedData.length} of {total} bets
               </div>
             </div>
@@ -234,7 +243,7 @@ const BettingHistoryPage = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
+                    <TableRow className="bg-gray-50 text-[13px]">
                       <TableHead 
                         className="cursor-pointer select-none"
                         onClick={() => handleSort('id')}
@@ -289,8 +298,8 @@ const BettingHistoryPage = () => {
                     {sortedData.map((item) => {
                       const { date, time } = formatDateTime(item.dateTime);
                       return (
-                        <TableRow key={item.id} className="hover:bg-gray-50">
-                          <TableCell className="font-mono text-sm">{item.id}</TableCell>
+                        <TableRow key={item.id} className="hover:bg-gray-50 text-[13px]">
+                          <TableCell className="font-mono ">{item.id}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {getTypeIcon(item.type)}
@@ -300,7 +309,7 @@ const BettingHistoryPage = () => {
                           <TableCell>{formatAmount(item.amount)}</TableCell>
                           <TableCell className="">{item.odds}</TableCell>
                           <TableCell>
-                            <div className="text-sm">
+                            <div className="">
                               <div className="">{date}</div>
                               <div className="text-gray-500">{time}
 
