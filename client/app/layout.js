@@ -2,9 +2,11 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ReduxProvider } from "@/components/ReduxProvider";
 import { SidebarProvider } from "@/contexts/SidebarContext.js";
+import AuthProvider from "@/components/auth/AuthProvider";
 import Header from "@/components/Header";
 import SidebarWrapper from "@/components/SidebarWrapper";
 import ContentWrapper from "@/components/ContentWrapper";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,26 +19,29 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className="antialiased h-screen overflow-hidden">
         <ReduxProvider>
-          <SidebarProvider>
-            <div className=" bg-gray-100">
-              {/* INFO: Header- */}
-              <div>
-                <Header />
-              </div>
+          <AuthProvider>
+            <SidebarProvider>
+              <div className="bg-gray-100 h-screen flex flex-col">
+                {/* Header */}
+                <div className="flex-shrink-0">
+                  <Header />
+                </div>
 
-              {/* Main Content Area */}
-              <div className="flex">
-                {/* Fixed Sidebar */}
-                <SidebarWrapper />
+                {/* Main Content Area */}
+                <div className="flex flex-1 overflow-hidden">
+                  {/* Fixed Sidebar */}
+                  <SidebarWrapper />
 
-                {/* Main Content Area with Secondary Navigation */}
-                <ContentWrapper>{children}</ContentWrapper>
+                  {/* Main Content Area with Secondary Navigation */}
+                  <ContentWrapper>{children}</ContentWrapper>
+                </div>
               </div>
-            </div>
-          </SidebarProvider>
+            </SidebarProvider>
+          </AuthProvider>
         </ReduxProvider>
+        <Toaster />
       </body>
     </html>
   );

@@ -4,3 +4,6 @@ export {
   errorHandler,
   asyncHandler,
 } from "../utils/customErrors.js";
+
+// Auth middleware exports
+export { authenticateToken, requireAdmin, optionalAuth } from "./auth.js";

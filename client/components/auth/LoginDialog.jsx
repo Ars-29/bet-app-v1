@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useDispatch, useSelector } from "react-redux"
+import { login, clearError, clearMessage, selectIsLoading, selectError, selectMessage, selectIsAuthenticated } from "@/lib/features/auth/authSlice"
+import { toast } from "sonner"
 // Zod validation schema
 const loginSchema = z.object({
     email: z.string().min(1, "Email is required").email("Please enter a valid email address"),
@@ -21,6 +24,13 @@ const LoginDialog = ({ children, ...props }) => {
     const [showPassword, setShowPassword] = useState(false)
     const [isOpen, setIsOpen] = useState(false)
     const router = useRouter()
+    const dispatch = useDispatch()
+
+    // Redux selectors
+    const isLoading = useSelector(selectIsLoading)
+    const error = useSelector(selectError)
+    const message = useSelector(selectMessage)
+    const isAuthenticated = useSelector(selectIsAuthenticated)
 
     const form = useForm({
         resolver: zodResolver(loginSchema),
@@ -30,10 +40,31 @@ const LoginDialog = ({ children, ...props }) => {
         },
     })
 
-    const onSubmit = (data) => {
-        console.log("Login data:", data)
-        // Handle login logic here
-        setIsOpen(false)
+    // Handle authentication success
+    useEffect(() => {
+        if (isAuthenticated) {
+            toast.success("Login successful! Welcome back!")
+            setIsOpen(false)
+            form.reset()
+        }
+    }, [isAuthenticated, form])
+
+    // Handle error messages
+    useEffect(() => {
+        if (error) {
+            toast.error(error)
+            dispatch(clearError())
+        }
+    }, [error, dispatch])
+
+    const onSubmit = async (data) => {
+        try {
+            console.log("Login data:", data)
+            dispatch(login(data))
+        } catch (error) {
+            console.error("Login error:", error)
+            toast.error("An unexpected error occurred")
+        }
     }
 
     const togglePasswordVisibility = () => {
@@ -122,15 +153,13 @@ const LoginDialog = ({ children, ...props }) => {
                             <Link href={"#"} className="text-xs text-base hover:text-base-dark underline">
                                 Forgotten password
                             </Link>
-                        </div>
-
-
-                        {/* Login Button */}
+                        </div>                        {/* Login Button */}
                         <Button
                             type="submit"
-                            className="w-full h-10 bg-warning text-black font-medium hover:bg-warning-dark"
+                            disabled={isLoading}
+                            className="w-full h-10 bg-warning text-black font-medium hover:bg-warning-dark disabled:opacity-50"
                         >
-                            LOG IN
+                            {isLoading ? "Logging in..." : "LOG IN"}
                         </Button>
                     </form>
                 </Form>

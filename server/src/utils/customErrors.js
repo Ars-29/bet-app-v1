@@ -1,9 +1,9 @@
 /**
  * Custom Error Classes and Error Handler Middleware
- * Comprehensive error handling system for the application
+ * Simplified error handling system with a single CustomError class
  */
 
-// Base Custom Error Class
+// Single Custom Error Class
 class CustomError extends Error {
   constructor(message, statusCode = 500, errorCode = "INTERNAL_ERROR") {
     super(message);
@@ -16,133 +16,16 @@ class CustomError extends Error {
   }
 }
 
-// API Related Errors
-class APIError extends CustomError {
-  constructor(message = "API Error", statusCode = 500) {
-    super(message, statusCode, "API_ERROR");
-  }
-}
-
-class SportsMonksAPIError extends APIError {
-  constructor(message = "SportsMonks API Error", statusCode = 502) {
-    super(message, statusCode);
-    this.errorCode = "SPORTSMONKS_API_ERROR";
-  }
-}
-
-class APITimeoutError extends APIError {
-  constructor(message = "API Request Timeout") {
-    super(message, 408);
-    this.errorCode = "API_TIMEOUT";
-  }
-}
-
-class APIRateLimitError extends APIError {
-  constructor(message = "API Rate Limit Exceeded") {
-    super(message, 429);
-    this.errorCode = "API_RATE_LIMIT";
-  }
-}
-
-// Client Errors (4xx)
-class BadRequestError extends CustomError {
-  constructor(message = "Bad Request") {
-    super(message, 400, "BAD_REQUEST");
-  }
-}
-
-class UnauthorizedError extends CustomError {
-  constructor(message = "Unauthorized") {
-    super(message, 401, "UNAUTHORIZED");
-  }
-}
-
-class ForbiddenError extends CustomError {
-  constructor(message = "Forbidden") {
-    super(message, 403, "FORBIDDEN");
-  }
-}
-
-class NotFoundError extends CustomError {
-  constructor(message = "Resource Not Found") {
-    super(message, 404, "NOT_FOUND");
-  }
-}
-
-class ConflictError extends CustomError {
-  constructor(message = "Conflict") {
-    super(message, 409, "CONFLICT");
-  }
-}
-
-class ValidationError extends CustomError {
-  constructor(message = "Validation Error", errors = []) {
-    super(message, 422, "VALIDATION_ERROR");
-    this.errors = errors;
-  }
-}
-
-// Server Errors (5xx)
-class InternalServerError extends CustomError {
-  constructor(message = "Internal Server Error") {
-    super(message, 500, "INTERNAL_ERROR");
-  }
-}
-
-class ServiceUnavailableError extends CustomError {
-  constructor(message = "Service Unavailable") {
-    super(message, 503, "SERVICE_UNAVAILABLE");
-  }
-}
-
-class DatabaseError extends CustomError {
-  constructor(message = "Database Error") {
-    super(message, 500, "DATABASE_ERROR");
-  }
-}
-
-// Data Related Errors
-class DataNotFoundError extends NotFoundError {
-  constructor(resource = "Data") {
-    super(`${resource} not found`);
-    this.errorCode = "DATA_NOT_FOUND";
-  }
-}
-
-class LeaguesNotFoundError extends DataNotFoundError {
-  constructor() {
-    super("Leagues");
-    this.errorCode = "LEAGUES_NOT_FOUND";
-  }
-}
-
-class MatchesNotFoundError extends DataNotFoundError {
-  constructor() {
-    super("Matches");
-    this.errorCode = "MATCHES_NOT_FOUND";
-  }
-}
-
-class MarketsNotFoundError extends DataNotFoundError {
-  constructor() {
-    super("Markets");
-    this.errorCode = "MARKETS_NOT_FOUND";
-  }
-}
-
-class OddsNotFoundError extends DataNotFoundError {
-  constructor() {
-    super("Odds");
-    this.errorCode = "ODDS_NOT_FOUND";
-  }
-}
-
 /**
  * 404 Not Found Middleware
  * Handles requests to routes that don't exist
  */
 const notFoundHandler = (req, res, next) => {
-  const error = new NotFoundError(`Route not found - ${req.originalUrl}`);
+  const error = new CustomError(
+    `Route not found - ${req.originalUrl}`,
+    404,
+    "NOT_FOUND"
+  );
   next(error);
 };
 
@@ -157,42 +40,45 @@ const errorHandler = (err, req, res, next) => {
   if (!(error instanceof CustomError)) {
     // Mongoose CastError (Invalid ObjectId)
     if (err.name === "CastError") {
-      error = new BadRequestError("Invalid resource ID format");
+      error = new CustomError("Invalid resource ID format", 400, "BAD_REQUEST");
     }
     // Mongoose Duplicate Key Error
     else if (err.code === 11000) {
       const field = Object.keys(err.keyValue || {})[0] || "field";
-      error = new ConflictError(`Duplicate ${field} value`);
+      error = new CustomError(`Duplicate ${field} value`, 409, "CONFLICT");
     }
     // Mongoose Validation Error
     else if (err.name === "ValidationError") {
       const messages = Object.values(err.errors).map((val) => val.message);
-      error = new ValidationError("Validation failed", messages);
+      error = new CustomError(
+        `Validation failed: ${messages.join(", ")}`,
+        422,
+        "VALIDATION_ERROR"
+      );
     }
     // JWT Errors
     else if (err.name === "JsonWebTokenError") {
-      error = new UnauthorizedError("Invalid token");
+      error = new CustomError("Invalid token", 401, "UNAUTHORIZED");
     } else if (err.name === "TokenExpiredError") {
-      error = new UnauthorizedError("Token expired");
+      error = new CustomError("Token expired", 401, "UNAUTHORIZED");
     }
     // Axios/HTTP Errors
     else if (err.response) {
       const status = err.response.status;
       const message = err.response.data?.message || err.message;
-
-      if (status >= 400 && status < 500) {
-        error = new APIError(message, status);
-      } else {
-        error = new SportsMonksAPIError(message, status);
-      }
+      error = new CustomError(`API Error: ${message}`, status, "API_ERROR");
     }
     // Request Timeout
     else if (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT") {
-      error = new APITimeoutError();
+      error = new CustomError("API Request Timeout", 408, "API_TIMEOUT");
     }
     // Generic server error
     else {
-      error = new InternalServerError(err.message || "Something went wrong");
+      error = new CustomError(
+        err.message || "Something went wrong",
+        500,
+        "INTERNAL_ERROR"
+      );
     }
   }
 
@@ -222,11 +108,6 @@ const errorHandler = (err, req, res, next) => {
       method: req.method,
     },
   };
-
-  // Add validation errors if present
-  if (error.errors && error.errors.length > 0) {
-    response.error.details = error.errors;
-  }
 
   // Add stack trace in development
   if (process.env.NODE_ENV === "development") {
@@ -259,36 +140,10 @@ const createErrorResponse = (error, req) => ({
   },
 });
 
-// Export all custom errors and handlers
+// Export the simplified error system
 export {
-  // Base Error
+  // Single Error Class
   CustomError,
-
-  // API Errors
-  APIError,
-  SportsMonksAPIError,
-  APITimeoutError,
-  APIRateLimitError,
-
-  // Client Errors
-  BadRequestError,
-  UnauthorizedError,
-  ForbiddenError,
-  NotFoundError,
-  ConflictError,
-  ValidationError,
-
-  // Server Errors
-  InternalServerError,
-  ServiceUnavailableError,
-  DatabaseError,
-
-  // Data Errors
-  DataNotFoundError,
-  LeaguesNotFoundError,
-  MatchesNotFoundError,
-  MarketsNotFoundError,
-  OddsNotFoundError,
 
   // Middleware
   notFoundHandler,

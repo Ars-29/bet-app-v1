@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -9,11 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import Link from "next/link"
+
 import { useRouter } from "next/navigation"
+import { useDispatch, useSelector } from "react-redux"
+import { signup, clearError, clearMessage, selectIsLoading, selectError, selectMessage, selectIsAuthenticated } from "@/lib/features/auth/authSlice"
+import { toast } from "sonner"
 import LoginDialog from "./LoginDialog"
 
-// Zod validation schema
+//INFO: Zod validation schema
 const signupSchema = z.object({
     firstName: z.string().min(1, "First name is required").min(2, "First name must be at least 2 characters"),
     lastName: z.string().min(1, "Last name is required").min(2, "Last name must be at least 2 characters"),
@@ -58,7 +61,15 @@ const signupSchema = z.object({
 
 const SignupPage = () => {
     const [showPassword, setShowPassword] = useState(false)
+    const [signupJustCompleted, setSignupJustCompleted] = useState(false)
     const router = useRouter()
+    const dispatch = useDispatch()
+
+    // Redux selectors
+    const isLoading = useSelector(selectIsLoading)
+    const error = useSelector(selectError)
+    const message = useSelector(selectMessage)
+    const isAuthenticated = useSelector(selectIsAuthenticated)
 
     const form = useForm({
         resolver: zodResolver(signupSchema),
@@ -77,11 +88,63 @@ const SignupPage = () => {
         },
     })
 
-    const onSubmit = (data) => {
-        console.log("Signup data:", data)
-        // Handle signup logic here
-        // After successful signup, redirect to login or dashboard
-        router.push('/')
+    // Redirect if already authenticated (but don't show success message)
+    useEffect(() => {
+        if (signupJustCompleted) {
+
+
+            router.push('/')
+        }
+    }, [isAuthenticated, signupJustCompleted, router])
+
+    // Handle authentication success after signup
+    useEffect(() => {
+        if (isAuthenticated && signupJustCompleted) {
+            toast.success("Account created successfully! Welcome aboard!")
+            router.push('/')
+        }
+    }, [isAuthenticated, signupJustCompleted, router])    // Handle error messages
+    useEffect(() => {
+        if (error) {
+            toast.error(error)
+            dispatch(clearError())
+            // Reset signup flag if there was an error
+            setSignupJustCompleted(false)
+        }
+    }, [error, dispatch])    // Handle success messages
+    useEffect(() => {
+        if (message && isAuthenticated) {
+            dispatch(clearMessage())
+        }
+    }, [message, isAuthenticated, dispatch])
+
+    const onSubmit = async (data) => {
+        try {
+            // Set flag to indicate signup is being attempted
+            setSignupJustCompleted(true)
+
+            // Convert dateOfBirth strings to numbers
+            const signupData = {
+                ...data,
+                dateOfBirth: {
+                    day: parseInt(data.dateOfBirth.day),
+                    month: parseInt(data.dateOfBirth.month),
+                    year: parseInt(data.dateOfBirth.year),
+                }
+            }
+
+            console.log("Signup data:", signupData)
+            const result = await dispatch(signup(signupData))
+
+            // If signup failed, reset the flag
+            if (signup.rejected.match(result)) {
+                setSignupJustCompleted(false)
+            }
+        } catch (error) {
+            console.error("Signup error:", error)
+            toast.error("An unexpected error occurred")
+            setSignupJustCompleted(false)
+        }
     }
 
     const togglePasswordVisibility = () => {
@@ -104,6 +167,7 @@ const SignupPage = () => {
         { value: "11", label: "November" },
         { value: "12", label: "December" },
     ]
+
     const currentYear = new Date().getFullYear()
     const years = Array.from({ length: 100 }, (_, i) => (currentYear - i).toString())
 
@@ -115,9 +179,9 @@ const SignupPage = () => {
     ]
 
     return (
-        <div className="bg-gray-50 min-h-full flex items-center justify-center p-4 lg:p-6">
-            <div className="w-full max-w-lg">
-                <div className="bg-white px-4 py-6 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-gray-50 min-h-full py-8 px-4 sm:px-6 lg:px-8">
+            <div className="w-full max-w-lg mx-auto">
+                <div className="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
                     {/* Header */}
                     <div className="mb-6">
                         <h2 className="text-center text-2xl font-bold text-gray-900">
@@ -129,9 +193,9 @@ const SignupPage = () => {
                     </div>
 
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             {/* Name Fields */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4 mb-1  ">
                                 <FormField
                                     control={form.control}
                                     name="firstName"
@@ -177,9 +241,10 @@ const SignupPage = () => {
                             <FormField
                                 control={form.control}
                                 name="email"
+
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-sm font-medium text-gray-700">
+                                        <FormLabel className="text-sm mb-1 font-medium text-gray-700">
                                             Email <span className="text-red-500">*</span>
                                         </FormLabel>
                                         <FormControl>
@@ -360,20 +425,19 @@ const SignupPage = () => {
                                         <FormMessage className="text-xs" />
                                     </FormItem>
                                 )}
-                            />
-
-                            {/* Signup Button */}
+                            />                            {/* Signup Button */}
                             <Button
                                 type="submit"
-                                className="w-full h-10 bg-warning text-black font-medium hover:bg-warning-dark"
+                                disabled={isLoading}
+                                className="w-full h-10 bg-warning text-black font-medium hover:bg-warning-dark disabled:opacity-50"
                             >
-                                CREATE ACCOUNT
+                                {isLoading ? "Creating Account..." : "CREATE ACCOUNT"}
                             </Button>
                         </form>
                     </Form>
 
                     {/* Login Section */}
-                    <div className="mt-6 pt-6 border-t border-gray-200">
+                    {/* <div className="mt-6 pt-6 border-t border-gray-200">
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-600">Already have an account?</span>
                             <LoginDialog>
@@ -386,7 +450,7 @@ const SignupPage = () => {
                                 </Button>
                             </LoginDialog>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
             </div>
         </div>

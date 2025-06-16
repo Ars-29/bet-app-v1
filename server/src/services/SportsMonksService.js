@@ -1,13 +1,6 @@
 import axios from "axios";
 import https from "https";
-import {
-  SportsMonksAPIError,
-  APITimeoutError,
-  LeaguesNotFoundError,
-  MatchesNotFoundError,
-  MarketsNotFoundError,
-  InternalServerError,
-} from "../utils/customErrors.js";
+import { CustomError } from "../utils/customErrors.js";
 
 class SportsMonksService {
   //INFO: This is for initializing the SportsMonks API client
@@ -61,33 +54,44 @@ class SportsMonksService {
         },
       });
       if (!response.data?.data || response.data.data.length === 0) {
-        throw new LeaguesNotFoundError();
+        throw new CustomError(
+          "SportsMonks API: No leagues found",
+          404,
+          "LEAGUES_NOT_FOUND"
+        );
       }
 
       return this.transformLeagues(response.data.data);
     } catch (error) {
       console.error("Error fetching leagues:", error);
 
-      if (error instanceof LeaguesNotFoundError) {
+      if (error instanceof CustomError) {
         throw error;
       }
 
       if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
-        throw new APITimeoutError(
-          "SportsMonks API timeout while fetching leagues"
+        throw new CustomError(
+          "SportsMonks API: Timeout while fetching leagues",
+          408,
+          "API_TIMEOUT"
         );
       }
 
       if (error.response) {
-        throw new SportsMonksAPIError(
-          `Failed to fetch leagues: ${
+        throw new CustomError(
+          `SportsMonks API: Failed to fetch leagues - ${
             error.response.data?.message || error.message
           }`,
-          error.response.status
+          error.response.status,
+          "SPORTSMONKS_API_ERROR"
         );
       }
 
-      throw new InternalServerError("Unable to fetch leagues at this time");
+      throw new CustomError(
+        "SportsMonks API: Unable to fetch leagues at this time",
+        500,
+        "INTERNAL_ERROR"
+      );
     }
   }
   async getMatches(leagueId) {
@@ -103,33 +107,44 @@ class SportsMonksService {
       });
 
       if (!response.data?.data || response.data.data.length === 0) {
-        throw new MatchesNotFoundError();
+        throw new CustomError(
+          "SportsMonks API: No matches found for this league",
+          404,
+          "MATCHES_NOT_FOUND"
+        );
       }
 
       return this.transformMatches(response.data.data);
     } catch (error) {
       console.error("Error fetching matches:", error);
 
-      if (error instanceof MatchesNotFoundError) {
+      if (error instanceof CustomError) {
         throw error;
       }
 
       if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
-        throw new APITimeoutError(
-          "SportsMonks API timeout while fetching matches"
+        throw new CustomError(
+          "SportsMonks API: Timeout while fetching matches",
+          408,
+          "API_TIMEOUT"
         );
       }
 
       if (error.response) {
-        throw new SportsMonksAPIError(
-          `Failed to fetch matches: ${
+        throw new CustomError(
+          `SportsMonks API: Failed to fetch matches - ${
             error.response.data?.message || error.message
           }`,
-          error.response.status
+          error.response.status,
+          "SPORTSMONKS_API_ERROR"
         );
       }
 
-      throw new InternalServerError("Unable to fetch matches at this time");
+      throw new CustomError(
+        "SportsMonks API: Unable to fetch matches at this time",
+        500,
+        "INTERNAL_ERROR"
+      );
     }
   }
   async getMarkets(matchId) {
@@ -141,33 +156,44 @@ class SportsMonksService {
       });
 
       if (!response.data?.data) {
-        throw new MarketsNotFoundError();
+        throw new CustomError(
+          "SportsMonks API: No markets found for this match",
+          404,
+          "MARKETS_NOT_FOUND"
+        );
       }
 
       return response.data.data;
     } catch (error) {
       console.error("Error fetching markets:", error);
 
-      if (error instanceof MarketsNotFoundError) {
+      if (error instanceof CustomError) {
         throw error;
       }
 
       if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
-        throw new APITimeoutError(
-          "SportsMonks API timeout while fetching markets"
+        throw new CustomError(
+          "SportsMonks API: Timeout while fetching markets",
+          408,
+          "API_TIMEOUT"
         );
       }
 
       if (error.response) {
-        throw new SportsMonksAPIError(
-          `Failed to fetch markets: ${
+        throw new CustomError(
+          `SportsMonks API: Failed to fetch markets - ${
             error.response.data?.message || error.message
           }`,
-          error.response.status
+          error.response.status,
+          "SPORTSMONKS_API_ERROR"
         );
       }
 
-      throw new InternalServerError("Unable to fetch markets at this time");
+      throw new CustomError(
+        "SportsMonks API: Unable to fetch markets at this time",
+        500,
+        "INTERNAL_ERROR"
+      );
     }
   }
 

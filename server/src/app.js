@@ -2,13 +2,26 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
+import connectDB from "./config/database.js";
 import { notFound, errorHandler } from "./middlewares/index.js";
 import sportsMonkRouter from "./routes/sportsMonk.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import userRoutes from "./routes/user.routes.js";
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Connect to MongoDB
+connectDB();
+
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
 // Simple Morgan configuration - shows device and request type
 morgan.token("device", (req) => {
@@ -31,8 +44,8 @@ app.get("/", (req, res) => {
 });
 
 // Add more routes here as needed
-// app.use('/api/users', userRoutes);
-// app.use('/api/auth', authRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/sportsmonk", sportsMonkRouter);
 
 // 404 handler - must be after all routes

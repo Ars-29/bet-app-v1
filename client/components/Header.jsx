@@ -3,11 +3,45 @@
 import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { User, Settings, LogOut } from 'lucide-react';
 import LoginDialog from '@/components/auth/LoginDialog';
 import { useCustomSidebar } from '@/contexts/SidebarContext.js';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectIsAuthenticated, selectUser, selectIsLoading, logout } from '@/lib/features/auth/authSlice';
+import { toast } from 'sonner';
 
 const Header = () => {
     const { toggleMobileSidebar } = useCustomSidebar();
+    const dispatch = useDispatch();
+    const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
+
+    // Redux selectors
+    const isAuthenticated = useSelector(selectIsAuthenticated);
+    const user = useSelector(selectUser);
+    const isLoading = useSelector(selectIsLoading); const handleLogout = async () => {
+        try {
+            await dispatch(logout()).unwrap();
+            toast.success("Logged out successfully");
+            setShowLogoutDialog(false);
+        } catch (error) {
+            toast.error("Logout failed");
+            setShowLogoutDialog(false);
+        }
+    };
+
+    const handleLogoutClick = () => {
+        setShowLogoutDialog(true);
+    };
+
+    const getUserInitials = (user) => {
+        if (!user) return 'U';
+        const firstName = user.firstName || '';
+        const lastName = user.lastName || '';
+        return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+    };
 
     return (
         <header className="bg-base text-white">
@@ -45,23 +79,86 @@ const Header = () => {
                             <div className="text-xs text-green-200">KINDRED</div>
                         </div>
 
-                        {/* Mobile menu button */}
-
-                    </div>                    <div className="flex items-center space-x-2 lg:space-x-3">
-                        <LoginDialog>
-                            <Button variant="outline" className="text-black border-white  hover:bg-gray-100 transition-all text-xs lg:text-sm px-2 lg:px-4 py-1 lg:py-2">
-                                Log in
-                            </Button>
-                        </LoginDialog>
-                        <Link href={"/signup"} className="active:scale-[0.98]
-                        transition-all  bg-warning text-black hover:bg-warning-dark text-xs lg:text-sm px-2 lg:px-4 py-1 lg:py-2 font-semibold ">
-
-                            Register
-
-                        </Link>
-                    </div>
+                        {/* Mobile menu button */}                    </div>
+                    <div className="flex items-center space-x-2 lg:space-x-3">                        {isAuthenticated ? (
+                        // Authenticated user menu
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button className="flex items-center space-x-3 h-auto p-2 rounded-lg transition-colors active:scale-0 focus:outline-none focus:ring-0 focus-visible:ring-0 data-[state=open]:bg-green-500/10">
+                                    <span className="hidden md:block text-sm text-gray-200">
+                                        Welcome, {user?.firstName || 'User'}
+                                    </span>
+                                    <Avatar className="h-8 w-8">
+                                        <AvatarFallback className="bg-warning text-black font-semibold">
+                                            {getUserInitials(user)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56" align="end" sideOffset={8} avoidCollisions={true}>
+                                <div className="flex items-center justify-start gap-2 p-2">
+                                    <div className="flex flex-col space-y-1">
+                                        <p className="text-sm font-medium leading-none">
+                                            {user?.firstName} {user?.lastName}
+                                        </p>
+                                        <p className="text-xs leading-none text-muted-foreground">
+                                            {user?.email}
+                                        </p>
+                                    </div>
+                                </div>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>
+                                    <User className="mr-2 h-4 w-4" />
+                                    <span>Profile</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    <span>Settings</span>
+                                </DropdownMenuItem>                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleLogoutClick} disabled={isLoading}>
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <span>Log out</span>
+                                </DropdownMenuItem></DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : (
+                        // Guest user buttons
+                        <>
+                            <LoginDialog>
+                                <Button variant="outline" className="text-black border-white hover:bg-gray-100 transition-all text-xs lg:text-sm px-2 lg:px-4 py-1 lg:py-2">
+                                    Log in
+                                </Button>
+                            </LoginDialog>
+                            <Link href={"/signup"} className="active:scale-[0.98] transition-all bg-warning text-black hover:bg-warning-dark text-xs lg:text-sm px-2 lg:px-4 py-1 lg:py-2 font-semibold">
+                                Register
+                            </Link>
+                        </>
+                    )}                    </div>
                 </div>
             </div>
+
+            {/* Logout Confirmation Dialog */}
+            <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to log out? You'll need to sign in again to access your account.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className={"px-1 py-1"} disabled={isLoading}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleLogout}
+                            disabled={isLoading}
+                            className="bg-red-500 py-1 px-2 hover:bg-red-600 "
+                        >
+                            {isLoading ? 'Logging out...' : 'Log out'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </header>
     );
 };
