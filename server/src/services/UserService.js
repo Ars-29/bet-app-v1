@@ -1,5 +1,4 @@
 import User from "../models/User.js";
-import bcrypt from "bcryptjs";
 import { CustomError } from "../utils/customErrors.js";
 import Bet from "../models/Bet.js";
 
@@ -153,10 +152,11 @@ class UserService {
    * @param {string} userId - User ID
    * @param {boolean} isAdmin - Whether the request is from an admin
    * @returns {Promise<Object>} User object
-   */
-  async getUserById(userId, isAdmin = false) {
+   */  async getUserById(userId, isAdmin = false) {
     try {
-      const user = await User.findById(userId).select("-password");
+      // For admin requests, include password and balance
+      const selectFields = isAdmin ? "" : "-password";
+      const user = await User.findById(userId).select(selectFields);
 
       if (!user) {
         throw new CustomError(
@@ -383,12 +383,9 @@ class UserService {
       // Get total count of users
       console.log("📊 Fetching total users count...");
       const totalUsers = await User.countDocuments();
-      console.log("📊 Total users count:", totalUsers);
-
-      // Get all users
+      console.log("📊 Total users count:", totalUsers);      // Get all users including passwords for admin
       console.log("📊 Fetching all users...");
       const users = await User.find()
-        .select("-password")
         .sort({ createdAt: -1 })
         .lean();
 
@@ -434,16 +431,13 @@ class UserService {
           400,
           "VALIDATION_ERROR"
         );
-      }
-
-      const users = await User.find({
+      }      const users = await User.find({
         $or: [
           { firstName: { $regex: query, $options: 'i' } },
           { lastName: { $regex: query, $options: 'i' } },
           { email: { $regex: query, $options: 'i' } }
         ]
       })
-        .select("-password")
         .sort({ createdAt: -1 });
 
       return users;
@@ -523,6 +517,8 @@ class UserService {
         "isActive",
         "role",
         "gender",
+        "password",
+        "balance",
       ];
       const updates = {};
 
@@ -559,12 +555,10 @@ class UserService {
           400,
           "VALIDATION_ERROR"
         );
-      }
-
-      const updatedUser = await User.findByIdAndUpdate(userId, updates, {
+      }      const updatedUser = await User.findByIdAndUpdate(userId, updates, {
         new: true,
         runValidators: true,
-      }).select("-password");
+      });
 
       if (!updatedUser) {
         throw new CustomError(
@@ -691,7 +685,6 @@ async deleteUserById(userId) {
   }
 }
 // ...existing code...
-
   async changePassword(userId, currentPassword, newPassword) {
     try {
       const user = await User.findById(userId);
@@ -699,18 +692,13 @@ async deleteUserById(userId) {
         throw new CustomError('User not found', 404);
       }
 
-      // Verify current password
-      const isMatch = await bcrypt.compare(currentPassword, user.password);
-      if (!isMatch) {
+      // Verify current password (plaintext comparison)
+      if (currentPassword !== user.password) {
         throw new CustomError('Current password is incorrect', 400);
       }
 
-      // Hash new password
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-      // Update password
-      user.password = hashedPassword;
+      // Update password (plaintext)
+      user.password = newPassword;
       await user.save();
 
       return { message: 'Password changed successfully' };

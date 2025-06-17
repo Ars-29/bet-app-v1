@@ -28,10 +28,6 @@ export default function UserDetails({ params }) {
   const isLoading = useSelector(selectIsLoading);
   const error = useSelector(selectError);
 
-  console.log('User Details Page - ID:', id);
-  console.log('User Details Page - Selected User:', selectedUser);
-  console.log('User Details Page - Loading:', isLoading);
-  console.log('User Details Page - Error:', error);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -40,24 +36,9 @@ export default function UserDetails({ params }) {
     phoneNumber: "",
     role: "",
     isActive: true,
+    password: "",
+    balance: 0,
   });
-
-  useEffect(() => {
-    console.log('User Details Page - Auth Check:', { isAuthenticated, user });
-    if (!isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-
-    if (!user || user.role !== "admin") {
-      router.push("/");
-      return;
-    }
-
-    console.log('User Details Page - Fetching user details for ID:', id);
-    dispatch(fetchUserDetails(id));
-  }, [user, isAuthenticated, dispatch, id, router]);
-
   useEffect(() => {
     console.log('User Details Page - Selected User Changed:', selectedUser);
     if (selectedUser) {
@@ -68,9 +49,17 @@ export default function UserDetails({ params }) {
         phoneNumber: selectedUser.phoneNumber || "",
         role: selectedUser.role || "",
         isActive: selectedUser.isActive,
+        password: selectedUser.password || "",
+        balance: selectedUser.balance || 0,
       });
     }
   }, [selectedUser]);
+
+  useEffect(() => {
+    if (id) {
+      dispatch(fetchUserDetails(id));
+    }
+  }, [id, dispatch]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -99,17 +88,7 @@ export default function UserDetails({ params }) {
     }
   };
 
-  if (!isAuthenticated || isLoading) {
-    console.log('User Details Page - Loading State:', { isAuthenticated, isLoading });
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-lg">Loading user details...</p>
-        </div>
-      </div>
-    );
-  }
+  
 
   if (!selectedUser && !error?.message?.includes('User account is not active')) {
     console.log('User Details Page - No User Found');
@@ -190,15 +169,39 @@ export default function UserDetails({ params }) {
                   }
                   required
                 />
-              </div>
-
-              <div className="space-y-2">
+              </div>              <div className="space-y-2">
                 <Label htmlFor="phoneNumber">Phone Number</Label>
                 <Input
                   id="phoneNumber"
                   value={formData.phoneNumber}
                   onChange={(e) =>
                     setFormData({ ...formData, phoneNumber: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="text"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  placeholder="Enter new password"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="balance">Balance</Label>
+                <Input
+                  id="balance"
+                  type="number"
+                  step="0.01"
+                  value={formData.balance}
+                  onChange={(e) =>
+                    setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })
                   }
                 />
               </div>
@@ -257,4 +260,4 @@ export default function UserDetails({ params }) {
       </Card>
     </div>
   );
-} 
+}
