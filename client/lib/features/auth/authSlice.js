@@ -1,36 +1,21 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-
-// API base URL
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import apiClient from "@/config/axios";
 
 // Async thunks for API calls
 export const signup = createAsyncThunk(
   "auth/signup",
   async (userData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Important for cookies
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
+      const response = await apiClient.post("/auth/signup", userData);
+      return response.data;
     } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -39,28 +24,16 @@ export const login = createAsyncThunk(
   "auth/login",
   async (credentials, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include", // Important for cookies
-        body: JSON.stringify(credentials),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
+      const response = await apiClient.post("/auth/login", credentials);
+      return response.data;
     } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -69,27 +42,16 @@ export const logout = createAsyncThunk(
   "auth/logout",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
+      const response = await apiClient.post("/auth/logout");
+      return response.data;
     } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -98,27 +60,16 @@ export const getMe = createAsyncThunk(
   "auth/getMe",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
+      const response = await apiClient.get("/auth/me");
+      return response.data;
     } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -127,27 +78,16 @@ export const refreshToken = createAsyncThunk(
   "auth/refreshToken",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
+      const response = await apiClient.post("/auth/refresh");
+      return response.data;
     } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -156,28 +96,16 @@ export const updateProfile = createAsyncThunk(
   "auth/updateProfile",
   async (profileData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(profileData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
+      const response = await apiClient.put("/users/profile", profileData);
+      return response.data;
     } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -186,28 +114,16 @@ export const changePassword = createAsyncThunk(
   "auth/changePassword",
   async (passwordData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/change-password`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(passwordData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
+      const response = await apiClient.put("/users/change-password", passwordData);
+      return response.data;
     } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );

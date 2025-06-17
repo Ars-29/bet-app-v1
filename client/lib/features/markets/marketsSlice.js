@@ -1,16 +1,12 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
-
-const API_BASE_URL = "http://localhost:4000/api/sportsmonk";
+import apiClient from "@/config/axios";
 
 // Async thunk for fetching markets by match
 export const fetchMarkets = createAsyncThunk(
   "markets/fetchMarkets",
   async (matchId, { rejectWithValue }) => {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/matches/${matchId}/markets`
-      );
+      const response = await apiClient.get(`/sportsmonk/matches/${matchId}/markets`);
       return {
         matchId,
         markets: response.data.data,
