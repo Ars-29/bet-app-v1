@@ -11,10 +11,53 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, ArrowUpDown, Calendar, DollarSign, Users, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { 
+  Search, 
+  ArrowUpDown, 
+  Calendar as CalendarIcon, 
+  DollarSign, 
+  Users, 
+  TrendingUp, 
+  ChevronLeft, 
+  ChevronRight,
+  Filter,
+  X,
+  Sliders,
+  User,
+  Clock,
+  Check,
+  Ticket,
+  Trophy,
+  ThumbsDown
+} from "lucide-react";
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { format } from "date-fns";
 
 // Generate more mock data for better pagination demonstration
 const generateMockBets = (count) => {
@@ -45,6 +88,9 @@ const generateMockBets = (count) => {
 
 const mockBets = generateMockBets(35);
 
+// Extract unique users for filter
+const uniqueUsers = [...new Set(mockBets.map(bet => bet.user))];
+
 const mockStats = {
   totalBets: mockBets.length,
   pending: mockBets.filter(bet => bet.status === 'Pending').length,
@@ -61,11 +107,46 @@ export default function BetManagement() {
   const [sortDirection, setSortDirection] = useState('asc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  
+  // Advanced filters
+  const [dateRange, setDateRange] = useState({ from: null, to: null });
+  const [selectedUser, setSelectedUser] = useState('all');
+  const [amountRange, setAmountRange] = useState({ min: '', max: '' });
+  const [activeFilters, setActiveFilters] = useState(0);
 
   const filteredBets = useMemo(() => {
     return mockBets.filter(bet => {
       // Filter by status
       if (filter !== 'all' && bet.status.toLowerCase() !== filter.toLowerCase()) {
+        return false;
+      }
+      
+      // Filter by user
+      if (selectedUser !== 'all' && bet.user !== selectedUser) {
+        return false;
+      }
+      
+      // Filter by date range
+      if (dateRange.from || dateRange.to) {
+        const betDate = new Date(bet.placedAt);
+        if (dateRange.from && betDate < dateRange.from) {
+          return false;
+        }
+        if (dateRange.to) {
+          const endDate = new Date(dateRange.to);
+          endDate.setHours(23, 59, 59);
+          if (betDate > endDate) {
+            return false;
+          }
+        }
+      }
+      
+      // Filter by amount range
+      if (amountRange.min && bet.amount < parseInt(amountRange.min)) {
+        return false;
+      }
+      if (amountRange.max && bet.amount > parseInt(amountRange.max)) {
         return false;
       }
       
@@ -79,7 +160,7 @@ export default function BetManagement() {
       
       return true;
     });
-  }, [filter, searchQuery]);
+  }, [filter, searchQuery, dateRange, selectedUser, amountRange]);
 
   const sortedBets = useMemo(() => {
     return [...filteredBets].sort((a, b) => {
@@ -90,7 +171,7 @@ export default function BetManagement() {
       }
       
       if (sortColumn === 'placedAt') {
-        return new Date(a.placedAt) - new Date(b.placedAt) * factor;
+        return (new Date(a.placedAt) - new Date(b.placedAt)) * factor;
       }
       
       const valueA = a[sortColumn]?.toString().toLowerCase() || '';
@@ -145,101 +226,521 @@ export default function BetManagement() {
     </TableHead>
   );
 
+  const resetFilters = () => {
+    setDateRange({ from: null, to: null });
+    setSelectedUser('all');
+    setAmountRange({ min: '', max: '' });
+    setActiveFilters(0);
+  };
+
+  const applyFilters = () => {
+    let count = 0;
+    if (dateRange.from || dateRange.to) count++;
+    if (selectedUser !== 'all') count++;
+    if (amountRange.min || amountRange.max) count++;
+    if (filter !== 'all') count++;
+    setActiveFilters(count);
+    setFilterDrawerOpen(false);
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <header className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-4 md:mb-0">Bet Management</h1>
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search bets..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 h-10 rounded-lg border-gray-200 bg-white shadow-sm"
-              />
+            <div className="flex gap-3 items-center">
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search bets..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 h-10 rounded-lg border-gray-200 bg-white"
+                />
+              </div>
+              
+              <Drawer open={filterDrawerOpen} onOpenChange={setFilterDrawerOpen} direction="right">
+                <DrawerTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="h-10 w-10 rounded-lg relative"
+                  >
+                    <Sliders className="h-4 w-4" />
+                    {activeFilters > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center">
+                        {activeFilters}
+                      </span>
+                    )}
+                  </Button>
+                </DrawerTrigger>
+                <DrawerContent className="right-0 h-full w-80 sm:w-96 rounded-l-xl fixed shadow-xl border-0">
+                  <div className="h-full flex flex-col bg-white">
+                    <DrawerHeader className="border-b border-gray-100 px-6 py-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <DrawerTitle className="text-xl font-semibold text-gray-900">Filters</DrawerTitle>
+                          <DrawerDescription className="text-sm text-gray-500 mt-1">
+                            Refine your bet list
+                          </DrawerDescription>
+                        </div>
+                        <DrawerClose asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </DrawerClose>
+                      </div>
+                    </DrawerHeader>
+                    
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="px-6 py-4 space-y-6">
+                        {/* Inside the drawer, add this as the first filter option */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                              <Filter className="h-4 w-4 text-gray-500" />
+                              Status
+                            </label>
+                            {filter !== 'all' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                onClick={() => setFilter('all')}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <Select value={filter} onValueChange={setFilter}>
+                            <SelectTrigger 
+                              className={`w-full h-10 px-3 hover:bg-transparent cursor-pointer rounded-none ${filter !== 'all' ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50' : ''}`}
+                            >
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent className="border border-gray-200 shadow-lg rounded-lg">
+                              <SelectItem value="all" className="py-2 px-3">
+                                All Bets
+                                <span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+                                  {mockStats.totalBets}
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="pending" className="py-2 px-3 text-amber-600">
+                                Pending
+                                <span className="ml-2 text-xs bg-amber-50 px-2 py-0.5 rounded-full text-amber-600">
+                                  {mockStats.pending}
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="won" className="py-2 px-3 text-emerald-600">
+                                Won
+                                <span className="ml-2 text-xs bg-emerald-50 px-2 py-0.5 rounded-full text-emerald-600">
+                                  {mockStats.won}
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="lost" className="py-2 px-3 text-rose-600">
+                                Lost
+                                <span className="ml-2 text-xs bg-rose-50 px-2 py-0.5 rounded-full text-rose-600">
+                                  {mockStats.lost}
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Then add a border-t before the next filter section */}
+                        <div className="space-y-3 pt-2 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                              <Clock className="h-4 w-4 text-gray-500" />
+                              Date Range
+                            </label>
+                            {(dateRange.from || dateRange.to) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                onClick={() => setDateRange({ from: null, to: null })}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={`w-full justify-start text-left font-normal h-10 pl-3 hover:bg-transparent ${dateRange.from ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50' : ''}`}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {dateRange.from ? (
+                                    format(dateRange.from, "PPP")
+                                  ) : (
+                                    <span className="text-gray-500">From date</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 border border-gray-200 shadow-lg rounded-lg">
+                                <Calendar
+                                  mode="single"
+                                  selected={dateRange.from}
+                                  onSelect={(date) => setDateRange(prev => ({ ...prev, from: date }))}
+                                  initialFocus
+                                  className="rounded-md"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={`w-full justify-start text-left font-normal h-10 pl-3 hover:bg-transparent ${dateRange.to ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50' : ''}`}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {dateRange.to ? (
+                                    format(dateRange.to, "PPP")
+                                  ) : (
+                                    <span className="text-gray-500">To date</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 border border-gray-200 shadow-lg rounded-lg">
+                                <Calendar
+                                  mode="single"
+                                  selected={dateRange.to}
+                                  onSelect={(date) => setDateRange(prev => ({ ...prev, to: date }))}
+                                  initialFocus
+                                  className="rounded-md"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                        
+                        {/* User Filter */}
+                        <div className="space-y-3 pt-2 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                              <User className="h-4 w-4 text-gray-500" />
+                              User
+                            </label>
+                            {selectedUser !== 'all' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                onClick={() => setSelectedUser('all')}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                className={`w-full justify-between h-10 px-3 hover:bg-transparent ${selectedUser !== 'all' ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50' : ''}`}
+                              >
+                                {selectedUser !== 'all' 
+                                  ? selectedUser 
+                                  : <span className="text-gray-500">Select user...</span>}
+                                <User className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0 border border-gray-200 shadow-lg rounded-lg" align="start">
+                              <Command>
+                                <CommandInput placeholder="Search user..." className="h-9 px-3" />
+                                <CommandList>
+                                  <CommandEmpty>No user found.</CommandEmpty>
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="all"
+                                      onSelect={() => setSelectedUser('all')}
+                                      className="py-2 px-3"
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${selectedUser === 'all' ? "opacity-100 text-blue-600" : "opacity-0"}`}
+                                      />
+                                      All Users
+                                    </CommandItem>
+                                    {uniqueUsers.map((user) => (
+                                      <CommandItem
+                                        key={user}
+                                        value={user}
+                                        onSelect={(currentValue) => setSelectedUser(currentValue)}
+                                        className="py-2 px-3"
+                                      >
+                                        <Check
+                                          className={`mr-2 h-4 w-4 ${selectedUser === user ? "opacity-100 text-blue-600" : "opacity-0"}`}
+                                        />
+                                        {user}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        
+                        {/* Amount Range Filter */}
+                        <div className="space-y-3 pt-2 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                              <DollarSign className="h-4 w-4 text-gray-500" />
+                              Amount Range
+                            </label>
+                            {(amountRange.min || amountRange.max) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                onClick={() => setAmountRange({ min: '', max: '' })}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <div className="flex gap-3 items-center">
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                placeholder="Min"
+                                value={amountRange.min}
+                                onChange={(e) => setAmountRange(prev => ({ ...prev, min: e.target.value }))}
+                                className={`h-10 border border-gray-200 ${amountRange.min ? 'border-blue-200 bg-blue-50' : ''}`}
+                              />
+                            </div>
+                            <div className="text-gray-400">to</div>
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                placeholder="Max"
+                                value={amountRange.max}
+                                onChange={(e) => setAmountRange(prev => ({ ...prev, max: e.target.value }))}
+                                className={`h-10 border border-gray-200 ${amountRange.max ? 'border-blue-200 bg-blue-50' : ''}`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-gray-100 p-6 bg-gray-50">
+                      <div className="flex flex-col gap-3">
+                        <Button 
+                          onClick={applyFilters}
+                          className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          Apply Filters
+                          {activeFilters > 0 && (
+                            <span className="ml-2 h-5 w-5 rounded-full bg-white text-emerald-600 text-xs flex items-center justify-center">
+                              {activeFilters}
+                            </span>
+                          )}
+                        </Button>
+                        
+                        <Button 
+                          variant="ghost" 
+                          onClick={resetFilters}
+                          className="w-full h-10 text-gray-700 hover:bg-gray-200 transition-colors"
+                        >
+                          Reset All
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </DrawerContent>
+              </Drawer>
             </div>
           </div>
         </header>
         
-        {/* Stats Cards */}
+        {/* Active Filters Display */}
+        {activeFilters > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {filter !== 'all' && (
+              <Badge variant="secondary" className="flex items-center gap-1 py-1 px-3">
+                <span>Status: {filter.charAt(0).toUpperCase() + filter.slice(1)}</span>
+                <button 
+                  className="ml-1 cursor-pointer"
+                  onClick={() => {
+                    setFilter('all');
+                    // Recalculate active filters
+                    let count = 0;
+                    if (dateRange.from || dateRange.to) count++;
+                    if (selectedUser !== 'all') count++;
+                    if (amountRange.min || amountRange.max) count++;
+                    setActiveFilters(count);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            
+            {dateRange.from && (
+              <Badge variant="secondary" className="flex items-center gap-1 py-1 px-3">
+                <span>From: {format(dateRange.from, "PP")}</span>
+                <button 
+                  className="ml-1 cursor-pointer"
+                  onClick={() => {
+                    const newDateRange = { ...dateRange, from: null };
+                    setDateRange(newDateRange);
+                    // Recalculate active filters
+                    let count = 0;
+                    if (filter !== 'all') count++;
+                    if (newDateRange.from || newDateRange.to) count++;
+                    if (selectedUser !== 'all') count++;
+                    if (amountRange.min || amountRange.max) count++;
+                    setActiveFilters(count);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            
+            {dateRange.to && (
+              <Badge variant="secondary" className="flex items-center gap-1 py-1 px-3">
+                <span>To: {format(dateRange.to, "PP")}</span>
+                <button 
+                  className="ml-1 cursor-pointer"
+                  onClick={() => {
+                    const newDateRange = { ...dateRange, to: null };
+                    setDateRange(newDateRange);
+                    // Recalculate active filters
+                    let count = 0;
+                    if (filter !== 'all') count++;
+                    if (newDateRange.from || newDateRange.to) count++;
+                    if (selectedUser !== 'all') count++;
+                    if (amountRange.min || amountRange.max) count++;
+                    setActiveFilters(count);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            
+            {selectedUser !== 'all' && (
+              <Badge variant="secondary" className="flex items-center gap-1 py-1 px-3">
+                <span>User: {selectedUser}</span>
+                <button 
+                  className="ml-1 cursor-pointer"
+                  onClick={() => {
+                    setSelectedUser('all');
+                    // Recalculate active filters
+                    let count = 0;
+                    if (filter !== 'all') count++;
+                    if (dateRange.from || dateRange.to) count++;
+                    if (amountRange.min || amountRange.max) count++;
+                    setActiveFilters(count);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            
+            {(amountRange.min || amountRange.max) && (
+              <Badge variant="secondary" className="flex items-center gap-1 py-1 px-3">
+                <span>Amount: ${amountRange.min || '0'} - ${amountRange.max || '∞'}</span>
+                <button 
+                  className="ml-1 cursor-pointer"
+                  onClick={() => {
+                    setAmountRange({ min: '', max: '' });
+                    // Recalculate active filters
+                    let count = 0;
+                    if (filter !== 'all') count++;
+                    if (dateRange.from || dateRange.to) count++;
+                    if (selectedUser !== 'all') count++;
+                    setActiveFilters(count);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs h-7"
+              onClick={resetFilters}
+            >
+              Clear all
+            </Button>
+          </div>
+        )}
+        
+        {/* Stats Cards - Text left, icon right layout */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex items-start">
-                <div className="p-5 flex-1">
-                  <p className="text-sm font-medium text-gray-500 mb-1">Total Bets</p>
+          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="px-5 py-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-blue-600 mb-1">All Bets</p>
                   <p className="text-2xl font-bold text-gray-900">{mockStats.totalBets}</p>
                 </div>
-                <div className="bg-blue-50 p-5">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
+                  <Ticket className="h-5 w-5 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex items-start">
-                <div className="p-5 flex-1">
-                  <p className="text-sm font-medium text-gray-500 mb-1">Pending</p>
-                  <p className="text-2xl font-bold text-amber-500">{mockStats.pending}</p>
+          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="px-5 py-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-amber-600 mb-1">Pending</p>
+                  <p className="text-2xl font-bold text-gray-900">{mockStats.pending}</p>
                 </div>
-                <div className="bg-amber-50 p-5">
-                  <Calendar className="h-5 w-5 text-amber-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex items-start">
-                <div className="p-5 flex-1">
-                  <p className="text-sm font-medium text-gray-500 mb-1">Won</p>
-                  <p className="text-2xl font-bold text-emerald-500">{mockStats.won}</p>
-                </div>
-                <div className="bg-emerald-50 p-5">
-                  <DollarSign className="h-5 w-5 text-emerald-600" />
+                <div className="h-12 w-12 rounded-full bg-amber-50 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-amber-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="flex items-start">
-                <div className="p-5 flex-1">
-                  <p className="text-sm font-medium text-gray-500 mb-1">Lost</p>
-                  <p className="text-2xl font-bold text-rose-500">{mockStats.lost}</p>
+          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="px-5 py-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-emerald-600 mb-1">Won</p>
+                  <p className="text-2xl font-bold text-gray-900">{mockStats.won}</p>
                 </div>
-                <div className="bg-rose-50 p-5">
-                  <Users className="h-5 w-5 text-rose-600" />
+                <div className="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <Trophy className="h-5 w-5 text-emerald-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Tabs for filtering */}
-        <div className="bg-white p-4 rounded-xl shadow-sm mb-6">
-          <Tabs defaultValue="all" value={filter} onValueChange={setFilter} className="w-full">
-            <TabsList className="grid grid-cols-4 h-10 p-1 bg-gray-100 rounded-lg">
-              <TabsTrigger value="all" className="rounded-md text-sm font-medium">
-                All
-              </TabsTrigger>
-              <TabsTrigger value="pending" className="rounded-md text-sm font-medium">
-                Pending
-              </TabsTrigger>
-              <TabsTrigger value="won" className="rounded-md text-sm font-medium">
-                Won
-              </TabsTrigger>
-              <TabsTrigger value="lost" className="rounded-md text-sm font-medium">
-                Lost
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          
+          <Card className="bg-white rounded-xl shadow-sm border-0 overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="px-5 py-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-rose-600 mb-1">Lost</p>
+                  <p className="text-2xl font-bold text-gray-900">{mockStats.lost}</p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-rose-50 flex items-center justify-center">
+                  <ThumbsDown className="h-5 w-5 text-rose-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Error and Success Messages */}
