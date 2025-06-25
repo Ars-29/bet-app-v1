@@ -1,0 +1,187 @@
+import fixtureOptimizationService from "../services/fixture.service.js";
+import { asyncHandler } from "../utils/customErrors.js";
+
+// Get optimized fixtures with pagination and filtering
+export const getOptimizedFixtures = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 50,
+    leagues,
+    dateFrom,
+    dateTo,
+    states,
+    includeOdds = "true",
+    priority,
+  } = req.query;
+
+  // Parse query parameters
+  const options = {
+    page: parseInt(page),
+    limit: Math.min(parseInt(limit), 100), // Limit to prevent abuse
+    leagues: leagues ? leagues.split(",").map((id) => parseInt(id)) : [],
+    dateFrom,
+    dateTo,
+    states: states ? states.split(",").map((id) => parseInt(id)) : [1],
+    includeOdds: includeOdds === "true",
+    priority,
+  };
+
+  const fixtures = await fixtureOptimizationService.getOptimizedFixtures(
+    options
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Optimized fixtures fetched successfully",
+    data: fixtures,
+    pagination: {
+      page: options.page,
+      limit: options.limit,
+      total: fixtures.length,
+    },
+    filters: {
+      leagues: options.leagues,
+      dateFrom: options.dateFrom,
+      dateTo: options.dateTo,
+      states: options.states,
+      includeOdds: options.includeOdds,
+      priority: options.priority,
+    },
+    cached: true, // Will be false if data is fresh from API
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Get today's fixtures (optimized for homepage)
+export const getTodaysFixtures = asyncHandler(async (req, res) => {
+  const { leagues } = req.query;
+  const leagueIds = leagues ? leagues.split(",").map((id) => parseInt(id)) : [];
+
+  const fixtures = await fixtureOptimizationService.getTodaysFixtures(
+    leagueIds
+  );
+  res.status(200).json({
+    success: true,
+    message: "Today's fixtures fetched successfully",
+    data: fixtures,
+    count: fixtures.length,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Get live fixtures (optimized for live betting)
+export const getLiveFixtures = asyncHandler(async (req, res) => {
+  const liveFixtures = await fixtureOptimizationService.getLiveFixtures();
+
+  res.status(200).json({
+    success: true,
+    message: "Live fixtures fetched successfully",
+    data: liveFixtures,
+    count: liveFixtures.length,
+    refresh_interval: 30, // Suggest refresh every 30 seconds
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Get upcoming fixtures
+export const getUpcomingFixtures = asyncHandler(async (req, res) => {
+  const { days = 7 } = req.query;
+  const daysAhead = Math.min(parseInt(days), 14); // Limit to 2 weeks
+
+  const fixtures = await fixtureOptimizationService.getUpcomingFixtures(
+    daysAhead
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Upcoming fixtures fetched successfully",
+    data: fixtures,
+    count: fixtures.length,
+    days_ahead: daysAhead,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Get popular leagues (cached)
+export const getPopularLeagues = asyncHandler(async (req, res) => {
+  const { limit = 10 } = req.query;
+  const parsedLimit = Math.min(parseInt(limit), 25); // Max 25 leagues
+
+  const leagues = await fixtureOptimizationService.getPopularLeagues(
+    parsedLimit
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Popular leagues fetched successfully",
+    data: leagues,
+    count: leagues.length,
+    requested_limit: parsedLimit,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Get cache statistics (for monitoring)
+export const getCacheStats = asyncHandler(async (req, res) => {
+  const stats = fixtureOptimizationService.getCacheStats();
+
+  res.status(200).json({
+    success: true,
+    message: "Cache statistics retrieved successfully",
+    data: stats,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Clear cache (admin function)
+export const clearCache = asyncHandler(async (req, res) => {
+  const { type = "all" } = req.body;
+
+  fixtureOptimizationService.clearCache(type);
+
+  res.status(200).json({
+    success: true,
+    message: `Cache cleared successfully (${type})`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Preload popular data (can be called via cron job)
+export const preloadData = asyncHandler(async (req, res) => {
+  await fixtureOptimizationService.preloadPopularData();
+
+  res.status(200).json({
+    success: true,
+    message: "Popular data preloaded successfully",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Get homepage data (optimized for homepage display)
+export const getHomepageFixtures = asyncHandler(async (req, res) => {
+  const homepageData = await fixtureOptimizationService.getHomepageData();
+
+  res.status(200).json({
+    success: true,
+    message: "Homepage fixtures fetched successfully",
+    data: {
+      top_picks: homepageData.top_picks || [],
+      football_daily: homepageData.football_daily || [],
+      // in_play: homepageData.in_play || [], //TODO: Skip for now
+    },
+    stats: {
+      top_picks_count: homepageData.top_picks?.length || 0,
+      football_daily_leagues: homepageData.football_daily?.length || 0,
+      total_daily_matches:
+        homepageData.football_daily?.reduce(
+          (sum, league) => sum + league.match_count,
+          0
+        ) || 0,
+    },
+    cache_info: {
+      cached: true,
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
+    },
+    timestamp: new Date().toISOString(),
+  });
+});

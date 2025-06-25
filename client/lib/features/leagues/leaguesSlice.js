@@ -16,11 +16,68 @@ export const fetchLeagues = createAsyncThunk(
   }
 );
 
+// Async thunk for fetching popular leagues for sidebar
+export const fetchPopularLeagues = createAsyncThunk(
+  "leagues/fetchPopularLeagues",
+  async (limit = 15, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.get("/fixtures/leagues/popular", {
+        params: { limit: 25 },
+      });
+
+      const leagues = response.data.data || [];
+      return leagues;
+    } catch (error) {
+      // Return fallback data if API fails
+      const fallbackLeagues = [
+        {
+          id: "odds-boost",
+          name: "Odds Boost",
+          icon: "💫",
+          count: null,
+          image_path: null,
+        },
+        {
+          id: "champions-league",
+          name: "Champions League",
+          icon: "⚽",
+          count: null,
+          image_path: null,
+        },
+        {
+          id: "premier-league",
+          name: "Premier League",
+          icon: "⚽",
+          count: null,
+          image_path: null,
+        },
+        { id: "nba", name: "NBA", icon: "🏀", count: null, image_path: null },
+        { id: "nhl", name: "NHL", icon: "🏒", count: null, image_path: null },
+        {
+          id: "la-liga",
+          name: "La Liga",
+          icon: "⚽",
+          count: null,
+          image_path: null,
+        },
+      ];
+
+      console.warn(
+        "Failed to fetch popular leagues, using fallback data:",
+        error
+      );
+      return fallbackLeagues;
+    }
+  }
+);
+
 const leaguesSlice = createSlice({
   name: "leagues",
   initialState: {
     data: [],
+    popularLeagues: [],
     loading: false,
+    popularLoading: false,
     error: null,
     selectedLeague: null,
   },
@@ -48,11 +105,25 @@ const leaguesSlice = createSlice({
       .addCase(fetchLeagues.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      // Popular leagues cases
+      .addCase(fetchPopularLeagues.pending, (state) => {
+        state.popularLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchPopularLeagues.fulfilled, (state, action) => {
+        state.popularLoading = false;
+        state.popularLeagues = action.payload;
+      })
+      .addCase(fetchPopularLeagues.rejected, (state, action) => {
+        state.popularLoading = false;
+        state.error = action.payload;
       });
   },
 });
 
-export const { clearError, setSelectedLeague, clearSelectedLeague } = leaguesSlice.actions;
+export const { clearError, setSelectedLeague, clearSelectedLeague } =
+  leaguesSlice.actions;
 export default leaguesSlice.reducer;
 
 // Selectors
@@ -60,3 +131,6 @@ export const selectLeagues = (state) => state.leagues.data;
 export const selectLeaguesLoading = (state) => state.leagues.loading;
 export const selectLeaguesError = (state) => state.leagues.error;
 export const selectSelectedLeague = (state) => state.leagues.selectedLeague;
+export const selectPopularLeagues = (state) => state.leagues.popularLeagues;
+export const selectPopularLeaguesLoading = (state) =>
+  state.leagues.popularLoading;

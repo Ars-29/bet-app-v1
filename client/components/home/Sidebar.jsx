@@ -3,19 +3,37 @@
 import React, { useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Pin, Users, Settings, DollarSign } from 'lucide-react';
 import { useCustomSidebar } from '../../contexts/SidebarContext.js';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { selectUser } from '@/lib/features/auth/authSlice';
+import {
+    fetchPopularLeagues,
+    selectPopularLeagues,
+    selectPopularLeaguesLoading
+} from '@/lib/features/leagues/leaguesSlice';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+
 
 const Sidebar = () => {
     const context = useCustomSidebar();
     const { isCollapsed, setIsCollapsed, isPinned, setIsPinned, isMobile } = context || {};
     const user = useSelector(selectUser);
     const pathname = usePathname();
+    const dispatch = useDispatch();
     const sidebarRef = useRef(null);
     const hoverTimeoutRef = useRef(null);
+
+    // Get popular leagues from Redux store
+    const popularLeagues = useSelector(selectPopularLeagues);
+    const popularLeaguesLoading = useSelector(selectPopularLeaguesLoading);
+
+    // Fetch popular leagues data on component mount (only for regular users)
+    useEffect(() => {
+        if (user?.role !== 'admin') {
+            dispatch(fetchPopularLeagues(15)); // Request 15 leagues instead of default 10
+        }
+    }, [dispatch, user?.role]);
 
     const adminMenuItems = [
         {
@@ -40,14 +58,18 @@ const Sidebar = () => {
         }
     ];
 
-    const userMenuItems = [
-        { name: 'Odds Boost', icon: '💫', count: null },
-        { name: 'Champions League', icon: '⚽', count: null },
-        { name: 'Premier League', icon: '⚽', count: null },
-        { name: 'NBA', icon: '🏀', count: null },
-        { name: 'NHL', icon: '🏒', count: null },
-        { name: 'La Liga', icon: '⚽', count: null },
+    // Fallback leagues if API data is not available
+    const fallbackLeagues = [
+        { id: 'odds-boost', name: 'Odds Boost', icon: '💫', count: null },
+        { id: 'champions-league', name: 'Champions League', icon: '⚽', count: null },
+        { id: 'premier-league', name: 'Premier League', icon: '⚽', count: null },
+        { id: 'nba', name: 'NBA', icon: '🏀', count: null },
+        { id: 'nhl', name: 'NHL', icon: '🏒', count: null },
+        { id: 'la-liga', name: 'La Liga', icon: '⚽', count: null },
     ];
+
+    // Use API data if available, otherwise fallback to static data
+    const leaguesToDisplay = popularLeagues.length > 0 ? popularLeagues : fallbackLeagues;
 
     // Handle mouse enter - disable on mobile
     const handleMouseEnter = () => {
@@ -154,14 +176,56 @@ const Sidebar = () => {
                         // User Menu
                         <div className="p-4">
                             <h3 className="text-sm font-semibold mb-3">POPULAR LEAGUES</h3>
-                            <div className="space-y-1">
-                                {userMenuItems.map((sport, index) => (
-                                    <div key={index} className="flex items-center py-2 px-3 hover:bg-gray-700 rounded cursor-pointer">
-                                        <span className="text-green-400 mr-3">{sport.icon}</span>
-                                        <span className="text-sm">{sport.name}</span>
-                                    </div>
-                                ))}
-                            </div>
+                            {popularLeaguesLoading ? (
+                                // Loading skeleton
+                                <div className="space-y-2">
+                                    {[...Array(6)].map((_, index) => (
+                                        <div key={index} className="flex items-center py-2 px-3 rounded">
+                                            <div className="w-6 h-6 bg-gray-600 rounded mr-3 animate-pulse"></div>
+                                            <div className="h-4 bg-gray-600 rounded flex-1 animate-pulse"></div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    {leaguesToDisplay.map((league, index) => {
+                                        const leagueHref = league.id === 'odds-boost'
+                                            ? '/'
+                                            : `/leagues/${league.id}`;
+
+                                        return (
+                                            <Link
+                                                key={league.id || index}
+                                                href={leagueHref}
+                                                className="flex items-center justify-between py-2 px-3 hover:bg-gray-700 rounded cursor-pointer group"
+                                            >
+                                                <div className="flex items-center">
+                                                    <div className="mr-3 w-6 h-6 flex items-center justify-center">
+                                                        {league.image_path ? (
+                                                            <img
+                                                                src={league.image_path}
+                                                                alt={league.name}
+                                                                className="w-5 h-5 object-contain"
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none';
+                                                                }}
+                                                            />
+                                                        ) : league.icon ? (
+                                                            <span className="text-green-400 text-sm">{league.icon}</span>
+                                                        ) : null}
+                                                    </div>
+                                                    <span className="text-sm">{league.name}</span>
+                                                </div>
+                                                {league.count && (
+                                                    <span className="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded group-hover:bg-gray-600">
+                                                        {league.count}
+                                                    </span>
+                                                )}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -194,11 +258,33 @@ const Sidebar = () => {
                             ))
                         ) : (
                             // User icons
-                            userMenuItems.slice(0, 6).map((sport, index) => (
-                                <div key={index} className="w-10 h-10 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center cursor-pointer transition-colors">
-                                    <span className="text-sm">{sport.icon}</span>
-                                </div>
-                            ))
+                            leaguesToDisplay.slice(0, 6).map((league, index) => {
+                                const leagueHref = league.id === 'odds-boost'
+                                    ? '/'
+                                    : `/leagues/${league.id}`;
+
+                                return (
+                                    <Link
+                                        key={league.id || index}
+                                        href={leagueHref}
+                                        className="w-10 h-10 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center cursor-pointer transition-colors"
+                                        title={league.name}
+                                    >
+                                        {league.image_path ? (
+                                            <img
+                                                src={league.image_path}
+                                                alt={league.name}
+                                                className="w-6 h-6 object-contain"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                }}
+                                            />
+                                        ) : league.icon ? (
+                                            <span className="text-white text-sm">{league.icon}</span>
+                                        ) : null}
+                                    </Link>
+                                );
+                            })
                         )}
                     </div>
                 </div>

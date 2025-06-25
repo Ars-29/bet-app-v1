@@ -2,121 +2,96 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useSelector } from 'react-redux';
 import MatchCard from './MatchCard';
+import { selectTopPicks } from '@/lib/features/home/homeSlice';
+
+// Helper function to transform API data to MatchCard format
+const transformMatchData = (apiMatch) => {
+    // Extract team names from the match name (e.g., "Hammarby vs Halmstad")
+    const teamNames = apiMatch.name?.split(' vs ') || ['Team A', 'Team B'];
+
+    // Extract main odds (1, X, 2) from the odds data
+    const odds = {};
+    if (apiMatch.odds) {
+        if (typeof apiMatch.odds === 'object' && !Array.isArray(apiMatch.odds)) {
+
+            if (apiMatch.odds.home && !isNaN(apiMatch.odds.home)) odds['1'] = apiMatch.odds.home.toFixed(2);
+            if (apiMatch.odds.draw && !isNaN(apiMatch.odds.draw)) odds['X'] = apiMatch.odds.draw.toFixed(2);
+            if (apiMatch.odds.away && !isNaN(apiMatch.odds.away)) odds['2'] = apiMatch.odds.away.toFixed(2);
+        } else if (Array.isArray(apiMatch.odds)) {
+            // Legacy array format (if still present)
+            apiMatch.odds.forEach(odd => {
+                // Handle different label formats from the API
+                const label = odd.label?.toString().toLowerCase();
+                const name = odd.name?.toString().toLowerCase();
+                const value = parseFloat(odd.value);
+
+                if (!isNaN(value)) {
+                    if (label === '1' || label === 'home' || name === 'home') {
+                        odds['1'] = value.toFixed(2);
+                    }
+                    if (label === 'x' || label === 'draw' || name === 'draw') {
+                        odds['X'] = value.toFixed(2);
+                    }
+                    if (label === '2' || label === 'away' || name === 'away') {
+                        odds['2'] = value.toFixed(2);
+                    }
+                }
+            });
+        }
+    }
+
+    // Format date and time
+    const startDate = new Date(apiMatch.starting_at);
+    const now = new Date();
+    const isToday = startDate.toDateString() === now.toDateString();
+    const isTomorrow = startDate.toDateString() === new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString();
+
+    let dateStr = startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    let timeStr = startDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    if (isToday) {
+        timeStr = `Today ${timeStr}`;
+    } else if (isTomorrow) {
+        timeStr = `Tomorrow ${timeStr}`;
+    }
+
+    return {
+        id: apiMatch.id,
+        league: {
+            name: apiMatch.league?.name, imageUrl: apiMatch.league?.image_path
+        },
+        team1: teamNames[0],
+        team2: teamNames[1],
+        date: dateStr,
+        time: timeStr,
+        odds: odds,
+        clock: true
+    };
+};
 
 const TopPicks = () => {
-    const matches = [
-        {
-            id: 'finland-poland',
-            tournament: 'World Cup Qualifying - Europe',
-            team1: 'Finland',
-            team2: 'Poland',
-            date: '10 Jun',
-            time: 'Today 23:45',
-            odds: {
-                '1': '3.70',
-                'X': '3.20',
-                '2': '2.08'
-            },
-            clock: true
-        },
-        {
-            id: 'netherlands-malta',
-            tournament: 'World Cup Qualifying - Europe',
-            team1: 'Netherlands',
-            team2: 'Malta',
-            date: '10 Jun',
-            time: 'Today 23:45',
-            odds: {
-                'X': '23.00',
-                '2': '71.00'
-            },
-            clock: true
-        },
-        {
-            id: 'romania-cyprus',
-            tournament: 'World Cup Qualifying - Europe',
-            team1: 'Romania',
-            team2: 'Cyprus',
-            date: '10 Jun',
-            time: 'Today 23:45',
-            odds: {
-                '1': '1.33',
-                'X': '4.80',
-                '2': '9.50'
-            },
-            clock: true
-        },
-        {
-            id: 'japan-indonesia',
-            tournament: 'World Cup Qualifying - Asia',
-            team1: 'Japan',
-            team2: 'Indonesia',
-            date: '6',
-            time: '0 81:07',
-            odds: {
-                'X': '1001.00'
-            },
-            clock: true
-        },
-        {
-            id: 'england-senegal',
-            tournament: 'International Friendly Matches',
-            team1: 'England',
-            team2: 'Senegal',
-            date: '10 Jun',
-            time: 'Today 23:45',
-            odds: {
-                '1': '1.45',
-                'X': '4.30',
-                '2': '7.00'
-            },
-            clock: true
-        },
-        {
-            id: 'azerbaijan-hungary',
-            tournament: 'International Friendly Matches',
-            team1: 'Azerbaijan',
-            team2: 'Hungary',
-            date: '10 Jun',
-            time: 'Today 21:00',
-            odds: {
-                '1': '4.90',
-                'X': '3.55',
-                '2': '1.75'
-            },
-            clock: true
-        },
-        {
-            id: 'Pakistan-hungary',
-            tournament: 'International Friendly Matches',
-            team1: 'Azerbaijan',
-            team2: 'Hungary',
-            date: '10 Jun',
-            time: 'Today 21:00',
-            odds: {
-                '1': '4.90',
-                'X': '3.55',
-                '2': '1.75'
-            },
-            clock: true
-        },
-        {
-            id: 'India-hungary',
-            tournament: 'International Friendly Matches',
-            team1: 'Azerbaijan',
-            team2: 'Hungary',
-            date: '10 Jun',
-            time: 'Today 21:00',
-            odds: {
-                '1': '4.90',
-                'X': '3.55',
-                '2': '1.75'
-            },
-            clock: true
-        }
+    const topPicks = useSelector(selectTopPicks);
 
-    ];
+    // Transform API data to MatchCard format and filter out matches without odds
+    const transformedMatches = topPicks
+        .map(transformMatchData)
+        .filter(match => match.odds && Object.keys(match.odds).length > 0);
+
+    if (transformedMatches.length === 0) {
+        return (
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-gray-800">Top picks</h2>
+                    <Link href="#" className="text-green-600 hover:underline text-sm">View All</Link>
+                </div>
+                <div className="text-gray-500 text-center py-8">
+                    No top picks available at the moment.
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="mb-8">
@@ -126,7 +101,7 @@ const TopPicks = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {matches.map((match) => (
+                {transformedMatches.slice(0, 8).map((match) => (
                     <MatchCard key={match.id} match={match} />
                 ))}
             </div>

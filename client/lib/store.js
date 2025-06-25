@@ -7,10 +7,12 @@ import adminUserReducer from "./features/admin/adminUserSlice";
 import betSlipReducer from "./features/betSlip/betSlipSlice";
 import transactionsReducer from "./features/transactions/transactionsSlice";
 import financeReducer from "./features/finance/financeSlice";
+import homeReducer from "./features/home/homeSlice";
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    home: homeReducer,
     leagues: leaguesReducer,
     matches: matchesReducer,
     markets: marketsReducer,

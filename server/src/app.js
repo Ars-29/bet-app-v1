@@ -11,6 +11,8 @@ import {
   authenticateToken,
 } from "./middlewares/index.js";
 import sportsMonkRouter from "./routes/sportsMonk.routes.js";
+
+import fixturesRouter from "./routes/fixtures.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import financeRoutes from "./routes/finance.routes.js";
@@ -52,6 +54,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/sportsmonk", sportsMonkRouter);
+app.use("/api/fixtures", fixturesRouter);
 app.use("/api/finance", authenticateToken, requireAdmin, financeRoutes);
 
 // 404 handler - must be after all routes

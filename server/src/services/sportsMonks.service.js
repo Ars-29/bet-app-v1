@@ -60,8 +60,9 @@ class SportsMonksService {
           "LEAGUES_NOT_FOUND"
         );
       }
+      console.log("Leagues fetched successfully:", response.data.data.length);
 
-      return this.transformLeagues(response.data.data);
+      return response.data.data;
     } catch (error) {
       console.error("Error fetching leagues:", error);
 
@@ -196,15 +197,57 @@ class SportsMonksService {
       );
     }
   }
+  async getOptimizedFixtures(apiParams) {
+    try {
+      console.log(
+        "🔍 Making optimized fixtures API call with params:",
+        apiParams
+      );
 
-  transformLeagues(leagues) {
-    return leagues.map((league) => ({
-      id: league.id,
-      name: league.name,
-      country: league.country?.name || "International",
-      logo: league.image_path || null,
-      active: league.active,
-    }));
+      const response = await this.client.get("/football/fixtures", {
+        params: apiParams,
+      });
+
+      if (!response.data?.data) {
+        throw new CustomError(
+          "SportsMonks API: No fixtures found",
+          404,
+          "FIXTURES_NOT_FOUND"
+        );
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching optimized fixtures:", error);
+
+      if (error instanceof CustomError) {
+        throw error;
+      }
+
+      if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+        throw new CustomError(
+          "SportsMonks API: Timeout while fetching fixtures",
+          408,
+          "API_TIMEOUT"
+        );
+      }
+
+      if (error.response) {
+        throw new CustomError(
+          `SportsMonks API: Failed to fetch fixtures - ${
+            error.response.data?.message || error.message
+          }`,
+          error.response.status,
+          "SPORTSMONKS_API_ERROR"
+        );
+      }
+
+      throw new CustomError(
+        "SportsMonks API: Unable to fetch fixtures at this time",
+        500,
+        "INTERNAL_ERROR"
+      );
+    }
   }
 
   transformMatches(matches) {

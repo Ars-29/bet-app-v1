@@ -41,7 +41,7 @@ const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
                 {league.matches.slice(0, 4).map((match, index) => (<div key={match.id}>
                     <div className='flex justify-between mt-2  '>
                         <div className=" text-xs text-gray-600">
-                            {isInPlay ? (match.liveTime || '45:32') : '21:00'}
+                            {isInPlay ? (match.liveTime || '45:32') : match.time}
                         </div>
                         <div className=" text-xs text-gray-500">
                             {isInPlay ? '' : '+358'}
@@ -136,12 +136,96 @@ const LeagueCards = ({
     title = "Football Daily",
     isInPlay = false,
     showDayTabs = true,
-    viewAllText = null
+    viewAllText = null,
+    useReduxData = false,
+    reduxData = []
 }) => {
     const scrollRef = useRef(null);
 
+    // Transform Redux data to match the expected format
+    const transformReduxData = (footballDaily) => {
+        console.log('Raw footballDaily data:', footballDaily); // Debug log
+
+        return footballDaily.map(leagueData => {
+            // Transform matches to match the expected format
+            const transformedMatches = leagueData.matches.map(match => {
+                console.log('Processing match:', match); // Debug log
+
+                const teamNames = match.name?.split(' vs ') || ['Team A', 'Team B'];
+
+                // Extract odds - handle the new object format from backend
+                const odds = {};
+
+                if (match.odds) {
+                    if (typeof match.odds === 'object' && !Array.isArray(match.odds)) {
+                        // New backend format: {"home": 2.00, "draw": 3.25, "away": 3.90}
+                        if (match.odds.home && !isNaN(match.odds.home)) odds['1'] = match.odds.home.toFixed(2);
+                        if (match.odds.draw && !isNaN(match.odds.draw)) odds['X'] = match.odds.draw.toFixed(2);
+                        if (match.odds.away && !isNaN(match.odds.away)) odds['2'] = match.odds.away.toFixed(2);
+                    } else if (Array.isArray(match.odds)) {
+                        // Legacy array format (if still present)
+                        match.odds.forEach(odd => {
+                            const value = parseFloat(odd.value);
+                            if (!isNaN(value)) {
+                                if (odd.label === '1' || odd.label === 'Home' || odd.name === 'Home') odds['1'] = value.toFixed(2);
+                                if (odd.label === 'X' || odd.label === 'Draw' || odd.name === 'Draw') odds['X'] = value.toFixed(2);
+                                if (odd.label === '2' || odd.label === 'Away' || odd.name === 'Away') odds['2'] = value.toFixed(2);
+                            }
+                        });
+                    }
+                }
+
+                // Skip match if no odds are available
+                if (Object.keys(odds).length === 0) {
+                    console.log('Skipping match with no odds:', match.name);
+                    return null; // Don't include this match
+                }
+
+                // Format the actual match time
+                let displayTime = '21:00'; // Default
+                if (match.starting_at) {
+                    const matchDate = new Date(match.starting_at);
+                    displayTime = matchDate.toLocaleTimeString('en-GB', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+
+                console.log('Transformed match:', {
+                    id: match.id,
+                    team1: teamNames[0],
+                    team2: teamNames[1],
+                    time: displayTime,
+                    odds
+                }); // Debug log
+
+                return {
+                    id: match.id,
+                    team1: teamNames[0],
+                    team2: teamNames[1],
+                    time: displayTime,
+                    odds: odds,
+                    clock: true
+                };
+            }).filter(match => match !== null); // Filter out null matches
+
+            return {
+                id: leagueData.league.id,
+                name: leagueData.league.name,
+                icon: "⚽", // Default icon
+                day: "Today",
+                matches: transformedMatches
+            };
+        });
+    };
+
     // Get appropriate data based on mode
-    const displayData = isInPlay ? getLiveLeagues() : leaguesData;
+    let displayData;
+    if (useReduxData && reduxData) {
+        displayData = transformReduxData(reduxData);
+    } else {
+        displayData = isInPlay ? getLiveLeagues() : leaguesData;
+    }
 
     // If in-play mode and no live matches, don't render the component
     if (isInPlay && displayData.length === 0) {

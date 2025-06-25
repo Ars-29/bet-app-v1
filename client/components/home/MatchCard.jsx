@@ -13,7 +13,11 @@ const MatchCard = ({ match }) => {
         <Link href={`/matches/${match.id}`}>
             <div className=" bg-white border border-gray-200 cursor-pointer rounded-none shadow-none">
                 <div className="p-4">
-                    <div className="text-xs text-gray-500 mb-2">{match.tournament}</div>
+
+                    <div className='flex align-center gap-2 justify-start mb-2 '>
+                        <img src={`${match.league.imageUrl}`} className='w-4 h-4' alt="" srcset="" />
+                        <div className="text-xs text-gray-500 ">{match.league.name}</div>
+                    </div>
 
                     <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
