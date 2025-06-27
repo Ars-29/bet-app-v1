@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
-const MatchVisualization = () => {
+const MatchVisualization = ({ matchData }) => {
     const [timeLeft, setTimeLeft] = useState({
         hours: 6,
         minutes: 30,

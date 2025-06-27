@@ -1,6 +1,10 @@
 import NodeCache from "node-cache";
 import sportsMonksService from "./sportsMonks.service.js";
 import { CustomError } from "../utils/customErrors.js";
+import {
+  classifyOdds,
+  transformToBettingData,
+} from "../utils/oddsClassification.js";
 
 class FixtureOptimizationService {
   constructor() {
@@ -794,6 +798,201 @@ class FixtureOptimizationService {
         this.liveCache.flushAll();
         this.leagueCache.flushAll();
         break;
+    }
+  }
+
+  async getMatchById(matchId, options = {}) {
+    const {
+      includeOdds = true,
+      includeLeague = true,
+      includeParticipants = true,
+    } = options;
+
+    if (!matchId) {
+      throw new CustomError("Match ID is required", 400, "INVALID_MATCH_ID");
+    }
+
+    // First, check if we have this match in any cached fixtures
+    let cachedMatch = null;
+    const cacheKeys = this.fixtureCache.keys();
+
+    // Search through all cached fixture data
+    for (const key of cacheKeys) {
+      if (key.startsWith("fixtures_") || key === "homepage_data") {
+        const cachedData = this.fixtureCache.get(key);
+
+        if (cachedData) {
+          let fixtures = [];
+
+          // Handle different cache data structures
+          if (Array.isArray(cachedData)) {
+            fixtures = cachedData;
+          } else if (cachedData.data && Array.isArray(cachedData.data)) {
+            fixtures = cachedData.data;
+          } else if (cachedData.top_picks || cachedData.football_daily) {
+            // Homepage data structure
+            fixtures = [
+              ...(cachedData.top_picks || []),
+              ...(cachedData.football_daily || []).flatMap(
+                (league) => league.matches || []
+              ),
+            ];
+          }
+
+          // Search for the match in this cached data
+          cachedMatch = fixtures.find(
+            (fixture) =>
+              fixture.id == matchId || fixture.id === parseInt(matchId)
+          );
+
+          if (cachedMatch) {
+            console.log("📦 Found match in cached data");
+            break;
+          }
+        }
+      }
+    }
+
+    // If not found in cache, make API call
+    if (!cachedMatch) {
+      console.log("🔍 Match not found in cache, making API call...");
+
+      this.checkRateLimit();
+
+      try {
+        const today = new Date();
+        const pastDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+        const futureDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days ahead
+
+        const apiResponse = await this.getOptimizedFixtures({
+          dateFrom: pastDate.toISOString().split("T")[0],
+          dateTo: futureDate.toISOString().split("T")[0],
+          states: [1, 2, 3], // All states: not started, live, finished
+          includeOdds,
+          limit: 500,
+        });
+
+        // Search for the specific match in the API response
+        let fixtures = [];
+        if (Array.isArray(apiResponse)) {
+          fixtures = apiResponse;
+        } else if (apiResponse.data && Array.isArray(apiResponse.data)) {
+          fixtures = apiResponse.data;
+        }
+
+        cachedMatch = fixtures.find(
+          (fixture) => fixture.id == matchId || fixture.id === parseInt(matchId)
+        );
+
+        if (!cachedMatch) {
+          throw new CustomError(
+            `Match with ID ${matchId} not found`,
+            404,
+            "MATCH_NOT_FOUND"
+          );
+        }
+
+        console.log("✅ Found match in API response");
+      } catch (error) {
+        if (error.code === "MATCH_NOT_FOUND") {
+          throw error;
+        }
+        console.error("❌ Error fetching match from API:", error);
+        throw new CustomError("Failed to fetch match data", 500, "API_ERROR");
+      }
+    }
+    cachedMatch.odds = this.groupOddsByMarket(cachedMatch.odds);
+
+    // Add odds classification and betting data format
+    if (cachedMatch.odds && Object.keys(cachedMatch.odds).length > 0) {
+      try {
+        const oddsData = { odds_by_market: cachedMatch.odds };
+        const classification = classifyOdds(oddsData);
+        cachedMatch.odds_classification = classification;
+        cachedMatch.betting_data = transformToBettingData(
+          classification,
+          cachedMatch
+        );
+      } catch (classificationError) {
+        console.error("⚠️ Error classifying odds:", classificationError);
+        // Provide fallback data structure
+        cachedMatch.odds_classification = {
+          categories: [{ id: "all", label: "All", odds_count: 0 }],
+          classified_odds: {},
+          stats: { total_categories: 0, total_odds: 0 },
+        };
+        cachedMatch.betting_data = [];
+      }
+    }
+
+    console.log(`✅ Successfully retrieved match ${matchId} with all details`);
+    return cachedMatch;
+  }
+
+  groupOddsByMarket(odds) {
+    if (!odds || !Array.isArray(odds)) return {};
+
+    const groupedOdds = {};
+
+    odds.forEach((odd) => {
+      const marketId = odd.market_id;
+      const marketDescription = odd.market_description || `Market ${marketId}`;
+
+      if (!groupedOdds[marketId]) {
+        groupedOdds[marketId] = {
+          market_id: marketId,
+          market_description: marketDescription,
+          odds: [],
+        };
+      }
+
+      groupedOdds[marketId].odds.push(odd);
+    });
+
+    return groupedOdds;
+  }
+
+  async getMatchesByLeague(leagueId, options = {}) {
+    if (!leagueId) {
+      throw new CustomError("League ID is required", 400, "INVALID_LEAGUE_ID");
+    }
+    const cacheKey = `league_matches_${leagueId}`;
+    // Check cache first
+    const cached = this.fixtureCache.get(cacheKey);
+    if (cached) {
+      console.log("📦 Returning cached matches for league from cache");
+      return cached;
+    }
+    // Fetch from SportMonks API
+    this.checkRateLimit();
+    try {
+      const apiParams = this.buildOptimizedApiParams({
+        leagues: [leagueId],
+        page: 1,
+        limit: 100,
+        includeOdds: options.includeOdds !== false,
+        states: [1, 2, 3],
+      });
+      const response = await sportsMonksService.getOptimizedFixtures(apiParams);
+      let fixtures = [];
+      if (Array.isArray(response.data)) {
+        fixtures = response.data;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        fixtures = response.data.data;
+      }
+      // Cache the result
+      this.fixtureCache.set(cacheKey, fixtures);
+      console.log(
+        `✅ Fetched and cached ${fixtures.length} matches for league ${leagueId}`
+      );
+      return fixtures;
+    } catch (error) {
+      console.error(
+        "❌ Error fetching matches for league from SportMonks API:",
+        error
+      );
+      // Always return an array, even if error
+      return [];
     }
   }
 }

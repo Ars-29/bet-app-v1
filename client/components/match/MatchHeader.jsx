@@ -2,20 +2,32 @@
 import { useRef, useState } from "react"
 import { ChevronLeft, ChevronDown, Clock } from "lucide-react"
 import MatchDropdown from "./MatchDropdown"
-import { allMatches } from "@/data/dummyMatches"
 import { useRouter } from "next/navigation"
-const MatchHeader = ({ matchId }) => {
+import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar"
+const MatchHeader = ({ matchData }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false)
     const triggetRef = useRef(null)
-    const currentMatch = allMatches.find(match => match.id === matchId)
-    const match = currentMatch || allMatches[0]
     const router = useRouter()
+
     const toggleDropdown = () => {
         setIsDropdownOpen(!isDropdownOpen)
     }
 
     const closeDropdown = () => {
         setIsDropdownOpen(false)
+    }
+
+    // Show loading state if no matchData
+    if (!matchData) {
+        return (
+            <div className="mb-4 bg-white p-3">
+                <div className="animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
+                    <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+                    <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -25,7 +37,8 @@ const MatchHeader = ({ matchId }) => {
                 onClick={() => { router.back() }}
                 className="flex cursor-pointer items-center text-xs text-slate-500 mb-3 hover:text-slate-600 transition-all" >
                 <ChevronLeft className="h-4 w-4" />
-                <span className="ml-1 truncate">Football | {match.competition}</span>
+                <span className="ml-1 truncate">Football | {matchData.league?.name || 'League'}</span>
+                {/* <span className="ml-1"> <img src={`${matchData.league.image_path}`} className="h-3 w-3" alt="" /> </span> */}
             </button>
 
             {/* Match Header */}
@@ -38,31 +51,35 @@ const MatchHeader = ({ matchId }) => {
                             ref={triggetRef}
                         >
                             <div className="flex items-center space-x-3">
-                                <TeamBadge
-                                    country={match.homeTeam.shortName}
-                                    color={match.homeTeam.jerseyColor}
-                                />
-                                <span className="text-base font-medium">{match.homeTeam.name}</span>
+                                <Avatar>
+                                    <AvatarImage className="w-10 h-10" src={`${matchData.participants?.[0]?.image_path}`} alt="@shadcn" />
+                                    <AvatarFallback>HomeTeam</AvatarFallback>
+                                </Avatar>
+                                <span className="text-base font-medium">{matchData.participants?.[0]?.name || 'Home Team'}</span>
                                 <span className=" text-slate-400">vs</span>
-                                <span className="text-base font-medium">{match.awayTeam.name}</span>
-                                <TeamBadge
-                                    country={match.awayTeam.shortName}
-                                    color={match.awayTeam.jerseyColor}
-                                />
+                                <span className="text-base font-medium">{matchData.participants?.[1]?.name || 'Away Team'}</span>
+                                <Avatar>
+                                    <AvatarImage className="w-10 h-10" src={`${matchData.participants?.[1]?.image_path}`} alt="@shadcn" />
+                                    <AvatarFallback>HomeTeam</AvatarFallback>
+                                </Avatar>
                             </div>
                             <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                         </div>
                         <div className="flex items-center text-xs text-slate-500">
                             <Clock className="h-3.5 w-3.5 mr-1.5" />
-                            <span className="whitespace-nowrap">{match.date} {match.time}</span>
+                            <span className="whitespace-nowrap">
+                                {matchData.starting_at ? new Date(matchData.starting_at).toLocaleDateString() : 'TBD'} {' '}
+                                {matchData.starting_at ? new Date(matchData.starting_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
                         </div>
                     </div>
-                </div>                <MatchDropdown
-                    matches={allMatches}
+                </div>                {/* MatchDropdown temporarily disabled - replace with real data later */}
+                <MatchDropdown
                     isOpen={isDropdownOpen}
                     onClose={closeDropdown}
                     triggerRef={triggetRef}
-                    currentMatchId={matchId}
+                    currentMatchId={matchData.id}
+                    currentLeagueId={matchData.league?.id}
                 />
             </div>
         </div>

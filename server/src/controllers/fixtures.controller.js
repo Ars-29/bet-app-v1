@@ -185,3 +185,70 @@ export const getHomepageFixtures = asyncHandler(async (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Get specific match by ID with all details
+export const getMatchById = asyncHandler(async (req, res) => {
+  const { matchId } = req.params;
+  const {
+    includeOdds = "true",
+    includeLeague = "true",
+    includeParticipants = "true",
+  } = req.query;
+
+  // Validate match ID
+  if (!matchId || isNaN(parseInt(matchId))) {
+    return res.status(400).json({
+      success: false,
+      message: "Valid match ID is required",
+      error: "INVALID_MATCH_ID",
+    });
+  }
+
+  const options = {
+    includeOdds: includeOdds === "true",
+    includeLeague: includeLeague === "true",
+    includeParticipants: includeParticipants === "true",
+  };
+
+  const match = await fixtureOptimizationService.getMatchById(
+    parseInt(matchId),
+    options
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Match details fetched successfully",
+    data: match,
+    options: {
+      includeOdds: options.includeOdds,
+      includeLeague: options.includeLeague,
+      includeParticipants: options.includeParticipants,
+    },
+    stats: {
+      odds_count:
+        match.odds && Array.isArray(match.odds)
+          ? match.odds.length
+          : Object.keys(match.odds || {}).length,
+      markets_count: match.odds_by_market
+        ? Object.keys(match.odds_by_market).length
+        : 0,
+      participants_count: match.participants ? match.participants.length : 0,
+      has_league_info: !!match.league,
+      classification_stats: match.odds_classification?.stats || null,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Get matches by league ID
+export const getMatchesByLeague = asyncHandler(async (req, res) => {
+  const { leagueId } = req.params;
+  const matches = await fixtureOptimizationService.getMatchesByLeague(leagueId);
+  res.status(200).json({
+    success: true,
+    message: `Matches for league ${leagueId} fetched successfully`,
+    data: matches,
+    count: matches.length,
+    timestamp: new Date().toISOString(),
+  });
+});

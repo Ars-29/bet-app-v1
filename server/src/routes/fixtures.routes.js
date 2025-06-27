@@ -9,6 +9,8 @@ import {
   getCacheStats,
   clearCache,
   preloadData,
+  getMatchById,
+  getMatchesByLeague,
 } from "../controllers/fixtures.controller.js";
 
 import { authenticateToken, requireAdmin } from "../middlewares/auth.js";
@@ -24,33 +26,10 @@ fixturesRouter.get("/upcoming", getUpcomingFixtures);
 fixturesRouter.get("/leagues/popular", getPopularLeagues);
 
 // Test endpoint to compare optimization
-fixturesRouter.get("/test/performance", async (req, res) => {
-  const startTime = Date.now();
+fixturesRouter.get("/:matchId", getMatchById);
 
-  try {
-    // Call optimized endpoint
-    const optimizedData = await getOptimizedFixtures(req, res);
-    const endTime = Date.now();
-
-    res.json({
-      success: true,
-      message: "Performance test completed",
-      optimization_results: {
-        response_time_ms: endTime - startTime,
-        data_size_kb: JSON.stringify(optimizedData).length / 1024,
-        estimated_api_calls_saved: "90%+",
-        caching_enabled: true,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Performance test failed",
-      error: error.message,
-    });
-  }
-});
+// Add new route for matches by league
+fixturesRouter.get("/league/:leagueId/matches", getMatchesByLeague);
 
 // INFO: These are admin routes for monitoring and cache management
 // // Protected routes for monitoring and admin

@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { X, ChevronLeft } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchPopularLeagues, fetchMatchesByLeague, selectPopularLeagues, selectMatchesByLeague, selectMatchesLoading, selectMatchesError } from '@/lib/features/leagues/leaguesSlice';
 
 // Jersey Image Component
 const JerseyImage = ({ src, alt, className = "w-12 h-12" }) => {
@@ -27,116 +29,73 @@ const JerseyImage = ({ src, alt, className = "w-12 h-12" }) => {
     );
 };
 
-const MatchDropdown = ({ matches, isOpen, onClose, currentMatchId, triggerRef }) => {
+const MatchDropdown = ({ isOpen, onClose, currentMatchId, triggerRef, currentLeagueId }) => {
     const dropdownRef = useRef(null);
     const [showLeagues, setShowLeagues] = useState(false);
-    const [selectedCompetition, setSelectedCompetition] = useState(null);
+    const [selectedLeagueId, setSelectedLeagueId] = useState(currentLeagueId || null);
+    const dispatch = useDispatch();
     const router = useRouter();
+
+    // Redux state
+    const leagues = useSelector(selectPopularLeagues);
+    const matches = useSelector(state => selectedLeagueId ? selectMatchesByLeague(state, selectedLeagueId) : []);
+    const matchesLoading = useSelector(selectMatchesLoading);
+    const matchesError = useSelector(selectMatchesError);
+
+    // Fetch leagues on open
+    useEffect(() => {
+        if (isOpen) {
+            dispatch(fetchPopularLeagues());
+        }
+    }, [isOpen, dispatch]);
+
+    // Fetch matches for selected league
+    useEffect(() => {
+        if (selectedLeagueId && isOpen) {
+            dispatch(fetchMatchesByLeague(selectedLeagueId));
+        }
+    }, [selectedLeagueId, isOpen, dispatch]);
+
     const handleClose = useCallback(() => {
-        setSelectedCompetition(null);
+        setSelectedLeagueId(currentLeagueId || null);
         setShowLeagues(false);
         onClose();
-    }, [onClose]); useEffect(() => {
+    }, [onClose, currentLeagueId]);
+
+    useEffect(() => {
         if (!isOpen) return;
-
-        console.log('Setting up event listeners for dropdown');
-
         const handleClick = (event) => {
-            console.log('=== CLICK EVENT ===');
-            console.log('Event target:', event.target);
-            console.log('Event type:', event.type);
-            console.log('Event currentTarget:', event.currentTarget);
-            console.log('Dropdown ref exists:', !!dropdownRef.current);
-            console.log('Contains check:', dropdownRef.current?.contains(event.target));
-
-            // Check if the click is outside the dropdown
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                console.log('✅ Click outside detected, closing dropdown');
                 onClose();
-            } else {
-                console.log('❌ Click inside dropdown, not closing');
             }
         };
-
         const handleEscape = (event) => {
             if (event.key === 'Escape') {
-                console.log('Escape key pressed, closing dropdown');
                 onClose();
             }
-        };        // Add all possible event listeners
-        console.log('Adding event listeners...');
-
-        // Simple global click detector for testing
-        const globalClickDetector = (e) => {
-            console.log('🌍 GLOBAL CLICK DETECTED:', e.target.tagName, e.target.className);
         };
-
-        document.addEventListener('click', globalClickDetector, true);
         document.addEventListener('click', handleClick, true);
         document.addEventListener('mousedown', handleClick, true);
         document.addEventListener('touchstart', handleClick, true);
         document.addEventListener('keydown', handleEscape);
-
-        // Also add without capture for comparison
-        document.addEventListener('click', handleClick, false);
-        document.addEventListener('mousedown', handleClick, false);
-
         return () => {
-            console.log('Removing event listeners...');
-            document.removeEventListener('click', globalClickDetector, true);
             document.removeEventListener('click', handleClick, true);
             document.removeEventListener('mousedown', handleClick, true);
             document.removeEventListener('touchstart', handleClick, true);
             document.removeEventListener('keydown', handleEscape);
-            document.removeEventListener('click', handleClick, false);
-            document.removeEventListener('mousedown', handleClick, false);
         };
     }, [isOpen, onClose]);
 
     if (!isOpen) return null;
 
-    // Find current match to get its competition
-    const currentMatch = matches.find(match => match.id === currentMatchId);
-    const currentCompetition = currentMatch?.competition || "European U21 Championship";
-
-    // Use selected competition if available, otherwise use current competition
-    const displayCompetition = selectedCompetition || currentCompetition;
-
-    // Filter matches by the display competition
-    const currentLeagueMatches = matches.filter(match => match.competition === displayCompetition);
-
-    // Get all unique competitions for leagues list
-    const allCompetitions = [...new Set(matches.map(match => match.competition))];
-
-    const handleBackToMatches = () => {
-        setShowLeagues(false);
-    };
-
-    const handleShowLeagues = () => {
-        setShowLeagues(true);
-    };
-
-
-    const handleSelectLeague = (competition) => {
-        // Set the selected competition and go back to matches view
-        setSelectedCompetition(competition);
-        setShowLeagues(false);
-    }; if (showLeagues) {
+    // Show leagues list (when back button is clicked)
+    if (showLeagues) {
         return (
             <div className="absolute top-full left-0 z-50 mt-2 w-[500px]" ref={dropdownRef}>
                 <Card className="border border-gray-300 shadow-xl bg-gray-800 w-full max-h-96 overflow-y-auto transform transition-all duration-300 ease-in-out dropdown-scrollbar">
                     <CardContent className="p-0">
-                        {/* Header with back and close buttons */}
                         <div className="bg-emerald-600 p-4 border-b border-gray-600 flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                                <button
-                                    onClick={handleBackToMatches}
-                                    className="text-white cursor-pointer hover:text-gray-200 transition-colors duration-200 p-1 hover:bg-emerald-700 rounded"
-                                >
-                                    <ChevronLeft className="h-5 w-5" />
-                                </button>
-                                <h3 className="text-white font-semibold text-base">Leagues</h3>
-                            </div>
+                            <h3 className="text-white font-semibold text-base">Leagues</h3>
                             <button
                                 onClick={handleClose}
                                 className="text-white cursor-pointer hover:text-gray-200 transition-colors duration-200 p-1 hover:bg-emerald-700 rounded"
@@ -145,33 +104,38 @@ const MatchDropdown = ({ matches, isOpen, onClose, currentMatchId, triggerRef })
                             </button>
                         </div>
                         <div className="animate-fadeIn">
-                            {allCompetitions.map((competition, index) => (
+                            {leagues.map((league) => (
                                 <button
-                                    key={index}
-                                    onClick={() => handleSelectLeague(competition)}
-                                    className="w-full text-left p-3 text-white hover:bg-gray-700 transition-colors duration-200 border-b border-gray-600 last:border-b-0 cursor-pointer text-sm"
+                                    key={league.id}
+                                    onClick={() => { setSelectedLeagueId(league.id); setShowLeagues(false); }}
+                                    className={`w-full text-left p-3 text-white hover:bg-gray-700 transition-colors duration-200 border-b border-gray-600 last:border-b-0 cursor-pointer text-sm ${selectedLeagueId === league.id ? 'bg-gray-700' : ''}`}
                                 >
-                                    <span>{competition}</span>
+                                    <span>{league.name}</span>
                                 </button>
                             ))}
-                        </div>                    </CardContent>
+                        </div>
+                    </CardContent>
                 </Card>
             </div>
         );
-    } return (
+    }
+
+    // Show matches for selected league
+    return (
         <div className="absolute top-full left-0 z-50 mt-2 w-[500px]" ref={dropdownRef}>
             <Card className="border border-gray-300 shadow-xl bg-gray-800 w-full max-h-96 overflow-y-auto transform transition-all duration-300 ease-in-out dropdown-scrollbar">
                 <CardContent className="p-0">
-                    {/* Header with back and close buttons */}
                     <div className="bg-emerald-600 p-4 border-b border-gray-600 flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                             <button
-                                onClick={handleShowLeagues}
+                                onClick={() => setShowLeagues(true)}
                                 className="text-white cursor-pointer hover:text-gray-200 transition-colors duration-200 p-1 hover:bg-emerald-700 rounded"
                             >
                                 <ChevronLeft className="h-5 w-5" />
                             </button>
-                            <h3 className="text-white font-semibold text-base">{displayCompetition}</h3>
+                            <h3 className="text-white font-semibold text-base">
+                                {leagues.find(l => l.id === selectedLeagueId)?.name || 'Matches'}
+                            </h3>
                         </div>
                         <button
                             onClick={handleClose}
@@ -180,12 +144,20 @@ const MatchDropdown = ({ matches, isOpen, onClose, currentMatchId, triggerRef })
                             <X className="h-5 w-5" />
                         </button>
                     </div>
-                    {/* Date header */}
                     <div className="bg-gray-700 p-3 text-center">
-                        <span className="text-white text-sm font-medium">Thu 12 Jun</span>
+                        <span className="text-white text-sm font-medium">Matches</span>
                     </div>
                     <div className="divide-y divide-gray-600 animate-fadeIn">
-                        {currentLeagueMatches.slice(0, 4).map((match) => (
+                        {matchesLoading && (
+                            <div className="text-center text-white py-8">Loading matches...</div>
+                        )}
+                        {matchesError && (
+                            <div className="text-center text-red-400 py-8">{matchesError}</div>
+                        )}
+                        {!matchesLoading && !matchesError && matches.length === 0 && (
+                            <div className="text-center text-gray-400 py-8">No matches found for this league.</div>
+                        )}
+                        {matches.slice(0, 20).map((match) => (
                             <Link
                                 key={match.id}
                                 href={`/matches/${match.id}`}
@@ -194,39 +166,37 @@ const MatchDropdown = ({ matches, isOpen, onClose, currentMatchId, triggerRef })
                             >
                                 <div className="p-4 bg-gray-800">
                                     <div className="flex items-center justify-between">
-                                        {/* Home Team */}
                                         <div className="flex flex-col items-center flex-1">
                                             <JerseyImage
-                                                src={match.homeTeam.jerseyImage}
-                                                alt={`${match.homeTeam.name} jersey`}
+                                                src={match.participants?.[0]?.image_path}
+                                                alt={match.participants?.[0]?.name}
                                                 className="w-12 h-12 mb-2"
                                             />
                                             <span className="text-white text-xs font-medium text-center leading-tight">
-                                                {match.homeTeam.name}
+                                                {match.participants?.[0]?.name}
                                             </span>
                                         </div>
-                                        {/* Time */}
                                         <div className="text-center flex-shrink-0 px-4">
                                             <div className="text-white font-bold text-sm">
-                                                {match.time}
+                                                {match.starting_at ? new Date(match.starting_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                             </div>
                                         </div>
-                                        {/* Away Team */}
                                         <div className="flex flex-col items-center flex-1">
                                             <JerseyImage
-                                                src={match.awayTeam.jerseyImage}
-                                                alt={`${match.awayTeam.name} jersey`}
+                                                src={match.participants?.[1]?.image_path}
+                                                alt={match.participants?.[1]?.name}
                                                 className="w-12 h-12 mb-2"
                                             />
                                             <span className="text-white text-xs font-medium text-center leading-tight">
-                                                {match.awayTeam.name}
+                                                {match.participants?.[1]?.name}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
                             </Link>
                         ))}
-                    </div>                    </CardContent>
+                    </div>
+                </CardContent>
             </Card>
         </div>
     );

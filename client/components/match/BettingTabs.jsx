@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -8,126 +6,33 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "../ui/button"
 import { useBetting } from "@/hooks/useBetting"
 
-// Dynamic market categorization based on market types and keywords
-const categorizeMarkets = (markets, tabs) => {
-    const categoryKeywords = {
-        "pre-packs": {
-            keywords: ["handicap", "double chance", "asian", "spread", "point spread"],
-            types: ["handicap", "double_chance", "asian_handicap", "spread"]
-        },
-        "full-time": {
-            keywords: ["full time", "match result", "1x2", "winner", "moneyline", "both teams", "total goals", "over", "under"],
-            types: ["match_winner", "both_teams_score", "total_goals", "over_under", "moneyline"]
-        },
-        "goal-scorer": {
-            keywords: ["goal scorer", "first goal", "last goal", "anytime", "correct score", "score"],
-            types: ["goal_scorer", "first_goal", "last_goal", "anytime_scorer", "correct_score"]
-        },
-        "player-shots": {
-            keywords: ["shots on target", "player shots", "shots"],
-            types: ["player_shots", "shots_on_target"]
-        },
-        "player-shots-2": {
-            keywords: ["shots off target", "blocked shots", "total shots"],
-            types: ["shots_off_target", "blocked_shots", "total_shots"]
-        },
-        "player-cards": {
-            keywords: ["cards", "yellow card", "red card", "booking"],
-            types: ["player_cards", "yellow_cards", "red_cards", "bookings"]
-        },
-        "player-goals": {
-            keywords: ["player goals", "hat trick", "goals scored"],
-            types: ["player_goals", "hat_trick", "goals_scored"]
-        },
-        "player-assists": {
-            keywords: ["assists", "key passes", "player assists"],
-            types: ["player_assists", "key_passes", "assists_made"]
-        }
-    };
 
-    const categorizedMarkets = {};
-
-    // Initialize categories
-    tabs.filter(tab => tab.id !== "all" && tab.id !== "bet-builder").forEach(tab => {
-        categorizedMarkets[tab.id] = [];
-    });
-
-    // Categorize each market dynamically
-    markets.forEach(market => {
-        const marketTitle = market.title?.toLowerCase() || '';
-        const marketType = market.type?.toLowerCase() || '';
-        const marketCategory = market.category?.toLowerCase() || '';
-
-        let categorized = false;
-
-        // Try to categorize based on market data
-        for (const [categoryId, config] of Object.entries(categoryKeywords)) {
-            const matchesKeyword = config.keywords.some(keyword =>
-                marketTitle.includes(keyword) ||
-                marketCategory.includes(keyword) ||
-                marketType.includes(keyword)
-            );
-
-            const matchesType = config.types.some(type =>
-                marketType.includes(type) ||
-                marketCategory.includes(type)
-            );
-
-            if (matchesKeyword || matchesType) {
-                if (categorizedMarkets[categoryId]) {
-                    categorizedMarkets[categoryId].push(market);
-                    categorized = true;
-                    break;
-                }
-            }
-        }
-
-        // If no category found, add to a general category or create one
-        if (!categorized) {
-            // You could add to 'full-time' as default or create an 'other' category
-            if (categorizedMarkets['full-time']) {
-                categorizedMarkets['full-time'].push(market);
-            }
-        }
-    });
-
-    return categorizedMarkets;
-};
-
-
-const getFilteredBettingData = (bettingData, tab) => {
-    if (!bettingData || bettingData.length === 0) return [];
-
-    if (tab.id === "bet-builder") return [];
-
-    // Use the dynamic categorization
-    const categorized = categorizeMarkets(bettingData, [tab]);
-    return categorized[tab.id] || [];
-};
-
-
-const BettingTabs = () => {
+const BettingTabs = ({ matchData }) => {
     const [selectedTab, setSelectedTab] = useState("all")
     const scrollAreaRef = useRef(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(true)
 
+    // Use the backend-provided betting data directly
+    const bettingData = matchData?.betting_data || [];
+    const categories = matchData?.odds_classification?.categories || [{ id: 'all', label: 'All', odds_count: 0 }];
+    const hasData = bettingData.length > 0;
+
+    // Helper function to get data by category
+    const getDataByCategory = useCallback((categoryId) => {
+        if (categoryId === 'all') {
+            return bettingData;
+        }
+        return bettingData.filter(item => item.category === categoryId);
+    }, [bettingData]);
+
     const tabs = useMemo(() => [
         { id: "all", label: "All" },
-        { id: "bet-builder", label: "Bet Builder" },
-        { id: "pre-packs", label: "Pre-packs" },
-        { id: "full-time", label: "Full Time" },
-        { id: "player-shots", label: "Player Shots on Target" },
-        { id: "player-shots-2", label: "Player Shots" },
-        { id: "player-cards", label: "Player Cards" },
-        { id: "goal-scorer", label: "Goal Scorer" },
-        { id: "player-goals", label: "Player Goals" },
-        { id: "player-assist", label: "Player Assists" },
-        { id: "player-assi", label: "Player Assists" },
-        { id: "player-ass", label: "Player Assists" },
-        { id: "player-assts", label: "Player Assists" },
-        { id: "player-assiss", label: "Player Assists" },
-    ], [])    // Check scroll state
+        ...categories.filter(cat => cat.id !== "all").map(cat => ({
+            id: cat.id,
+            label: cat.label
+        }))
+    ], [categories])    // Check scroll state
     const checkScrollState = useCallback(() => {
         const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
         if (scrollElement) {
@@ -174,96 +79,12 @@ const BettingTabs = () => {
         setTimeout(checkScrollState, 200)
 
         return () => window.removeEventListener('resize', handleResize)
-    }, [checkScrollState])// Memoized betting data to prevent unnecessary re-computations
-    // This structure should match what your API returns
-    const bettingData = useMemo(() => [
-        {
-            id: "3-way-handicap",
-            title: "3-Way Handicap",
-            type: "handicap",
-            category: "pre-match",
-            options: [
-                { label: "Mexico", odds: "1.40" },
-                { label: "Draw", odds: "4.35" },
-                { label: "Dominican Republic", odds: "6.25" },
-            ],
-        },
-        {
-            id: "full-time",
-            title: "Full Time Result",
-            type: "match_winner",
-            category: "main",
-            options: [
-                { label: "Mexico", odds: "1.01" },
-                { label: "Draw", odds: "18.00" },
-                { label: "Dominican Republic", odds: "67.00" },
-            ],
-        },
-        {
-            id: "total-goals",
-            title: "Total Goals",
-            type: "total_goals",
-            category: "goals",
-            options: [
-                { label: "Over 2.5", odds: "2.10" },
-                { label: "Under 2.5", odds: "3.60" },
-                { label: "Over 1.5", odds: "3.65" },
-                { label: "Under 1.5", odds: "4.30" },
-                { label: "Over 3.5", odds: "1.68" },
-                { label: "Under 3.5", odds: "2.80" },
-            ],
-        },
-        {
-            id: "double-chance",
-            title: "Double Chance",
-            type: "double_chance",
-            category: "pre-match",
-            options: [
-                { label: "1X", odds: "1.70" },
-                { label: "X2", odds: "1.25" },
-                { label: "12", odds: "1.28" },
-            ],
-        },
-        {
-            id: "both-teams-score",
-            title: "Both Teams to Score",
-            type: "both_teams_score",
-            category: "goals",
-            options: [
-                { label: "Yes", odds: "1.85" },
-                { label: "No", odds: "1.95" },
-            ],
-        },
-        {
-            id: "correct-score",
-            title: "Correct Score",
-            type: "correct_score",
-            category: "score",
-            options: [
-                { label: "1-0", odds: "8.50" },
-                { label: "2-0", odds: "12.00" },
-                { label: "2-1", odds: "9.75" },
-                { label: "1-1", odds: "6.25" },
-                { label: "0-0", odds: "9.00" },
-                { label: "0-1", odds: "15.00" },
-            ],
-        },
-        // Example of player-specific markets that might come from API
-        {
-            id: "player-shots-1",
-            title: "Player Shots on Target - Messi",
-            type: "player_shots",
-            category: "player_stats",
-            player: "Lionel Messi",
-            options: [
-                { label: "Over 1.5", odds: "1.80" },
-                { label: "Under 1.5", odds: "2.00" },
-            ],
-        },
-    ], [])// Memoized filtered data for individual tabs
+    }, [checkScrollState])
+
+    // Memoized filtered data for individual tabs
     const getTabData = useCallback((tab) => {
-        return getFilteredBettingData(bettingData, tab);
-    }, [bettingData]); return (
+        return getDataByCategory(tab.id);
+    }, [getDataByCategory]); return (
         <div className="mb-6  -mt-6">
             <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full ">                {/* Tab navigation with scroll buttons */}
                 <div className="mb-4 sm:mb-6 bg-white pb-2 pl-2 sm:pl-[13px] p-1">
@@ -340,19 +161,29 @@ const BettingTabs = () => {
 
 
 const BettingAccordionGroupAll = ({ bettingData, tabs }) => {
-    // Memoized category groups with dynamic categorization
+    // Create category groups from backend data
     const categoryGroups = useMemo(() => {
         if (!bettingData || bettingData.length === 0) return [];
 
-        const categorizedMarkets = categorizeMarkets(bettingData, tabs);
+        // Group betting data by category
+        const groupedByCategory = {};
 
+        bettingData.forEach(item => {
+            const categoryId = item.category;
+            if (!groupedByCategory[categoryId]) {
+                groupedByCategory[categoryId] = [];
+            }
+            groupedByCategory[categoryId].push(item);
+        });
+
+        // Map to the format expected by the component
         return tabs
-            .filter(tab => tab.id !== "all" && tab.id !== "bet-builder")
+            .filter(tab => tab.id !== "all")
             .map(tab => ({
                 id: tab.id,
                 label: tab.label,
-                markets: categorizedMarkets[tab.id] || [],
-                totalMarkets: (categorizedMarkets[tab.id] || []).length
+                markets: groupedByCategory[tab.id] || [],
+                totalMarkets: (groupedByCategory[tab.id] || []).length
             }))
             .filter(group => group.markets.length > 0);
     }, [bettingData, tabs]);
