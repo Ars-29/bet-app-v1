@@ -1,15 +1,22 @@
 import mongoose from "mongoose";
-
+import betService from "../services/bet.service.js";
 const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(
-      process.env.MONGODB_URI || "mongodb://localhost:27017/bet-app"
-    );
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
-  }
+  mongoose.connect("mongodb://localhost:27017/bet-app").then(async () => {
+    console.log("Connected to MongoDB");
+    // Recover missed bets on startup
+    try {
+      await betService.recoverMissedBets();
+      console.log("Missed bets recovery completed");
+    } catch (error) {
+      console.error("Error recovering missed bets:", error);
+    }
+  }).catch((error) => {
+    console.error("MongoDB connection error:", error);
+  });
 };
 
 export default connectDB;
+
+
+
+

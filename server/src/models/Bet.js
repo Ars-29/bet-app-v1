@@ -1,3 +1,4 @@
+// models/Bet.js
 import mongoose from "mongoose";
 
 const betSchema = new mongoose.Schema(
@@ -44,6 +45,10 @@ const betSchema = new mongoose.Schema(
       type: Date,
       required: [true, "Match date is required"],
     },
+    estimatedMatchEnd: {
+      type: Date,
+      required: [true, "Estimated match end time is required"],
+    },
     teams: {
       type: String,
       required: [true, "Teams are required"],
@@ -61,5 +66,4 @@ const betSchema = new mongoose.Schema(
 );
 
 const Bet = mongoose.model("Bet", betSchema);
-
 export default Bet;

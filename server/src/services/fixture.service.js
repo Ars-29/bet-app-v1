@@ -811,6 +811,33 @@ class FixtureOptimizationService {
     }
   }
 
+  /**
+   * Utility: Get all cached fixtures from fixtureCache
+   * Returns a flat array of all fixtures in the cache (from all keys)
+   */
+  getAllCachedMatches() {
+    const cacheKeys = this.fixtureCache.keys();
+    let allFixtures = [];
+    for (const key of cacheKeys) {
+      if (key.startsWith("fixtures_") || key === "homepage_data") {
+        const cachedData = this.fixtureCache.get(key);
+        if (cachedData) {
+          if (Array.isArray(cachedData)) {
+            allFixtures = allFixtures.concat(cachedData);
+          } else if (cachedData.data && Array.isArray(cachedData.data)) {
+            allFixtures = allFixtures.concat(cachedData.data);
+          } else if (cachedData.top_picks || cachedData.football_daily) {
+            allFixtures = allFixtures.concat(
+              cachedData.top_picks || [],
+              ...(cachedData.football_daily || []).map((l) => l.matches || [])
+            );
+          }
+        }
+      }
+    }
+    return allFixtures;
+  }
+
   async getMatchById(matchId, options = {}) {
     const {
       includeOdds = true,
@@ -822,45 +849,14 @@ class FixtureOptimizationService {
       throw new CustomError("Match ID is required", 400, "INVALID_MATCH_ID");
     }
 
-    // First, check if we have this match in any cached fixtures
-    let cachedMatch = null;
-    const cacheKeys = this.fixtureCache.keys();
+    // Use the utility to get all cached matches
+    const allCachedMatches = this.getAllCachedMatches();
+    let cachedMatch = allCachedMatches.find(
+      (fixture) => fixture.id == matchId || fixture.id === parseInt(matchId)
+    );
 
-    // Search through all cached fixture data
-    for (const key of cacheKeys) {
-      if (key.startsWith("fixtures_") || key === "homepage_data") {
-        const cachedData = this.fixtureCache.get(key);
-
-        if (cachedData) {
-          let fixtures = [];
-
-          // Handle different cache data structures
-          if (Array.isArray(cachedData)) {
-            fixtures = cachedData;
-          } else if (cachedData.data && Array.isArray(cachedData.data)) {
-            fixtures = cachedData.data;
-          } else if (cachedData.top_picks || cachedData.football_daily) {
-            // Homepage data structure
-            fixtures = [
-              ...(cachedData.top_picks || []),
-              ...(cachedData.football_daily || []).flatMap(
-                (league) => league.matches || []
-              ),
-            ];
-          }
-
-          // Search for the match in this cached data
-          cachedMatch = fixtures.find(
-            (fixture) =>
-              fixture.id == matchId || fixture.id === parseInt(matchId)
-          );
-
-          if (cachedMatch) {
-            console.log("📦 Found match in cached data");
-            break;
-          }
-        }
-      }
+    if (cachedMatch) {
+      console.log("📦 Found match in cached data (via utility method)");
     }
 
     // If not found in cache, make API call
@@ -877,7 +873,7 @@ class FixtureOptimizationService {
         const apiResponse = await this.getOptimizedFixtures({
           dateFrom: pastDate.toISOString().split("T")[0],
           dateTo: futureDate.toISOString().split("T")[0],
-          states: [1, 2, 3], // All states: not started, live, finished
+          states: [1, 2, 3],
           includeOdds,
           limit: 500,
         });

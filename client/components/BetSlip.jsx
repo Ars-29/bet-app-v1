@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { X, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -34,6 +34,7 @@ const BetSlip = () => {
     const isExpanded = useSelector(selectBetSlipExpanded);
     const activeTab = useSelector(selectActiveTab);
     const betSlipRef = useRef(null);
+    const [isPlacingBet, setIsPlacingBet] = React.useState(false);
 
     // Calculate totals when relevant data changes
     useEffect(() => {
@@ -105,8 +106,7 @@ const BetSlip = () => {
     };
 
     const handlePlaceBet = async () => {
-        console.log("Placing bet");
-
+        setIsPlacingBet(true);
         try {
             const resultAction = await dispatch(placeBetThunk());
             if (placeBetThunk.fulfilled.match(resultAction)) {
@@ -117,6 +117,8 @@ const BetSlip = () => {
             }
         } catch (err) {
             toast.error('Failed to place bet.');
+        } finally {
+            setIsPlacingBet(false);
         }
     };
 
@@ -280,10 +282,17 @@ const BetSlip = () => {
                         {/* Place Bet Button */}
                         <Button
                             className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 transition-all duration-200"
-                            disabled={betSlip.totalStake === 0}
+                            disabled={betSlip.totalStake === 0 || isPlacingBet}
                             onClick={handlePlaceBet}
                         >
-                            Place Bet
+                            {isPlacingBet ? (
+                                <span className="flex items-center justify-center">
+                                    <Loader2 className="animate-spin h-5 w-5 mr-2 text-black" />
+                                    Placing Bet...
+                                </span>
+                            ) : (
+                                'Place Bet'
+                            )}
                         </Button>
                     </div>
                 </div>)}

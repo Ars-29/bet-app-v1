@@ -5,13 +5,13 @@ class BetController {
   async placeBet(req, res, next) {
     console.log("Placing bet");
     try {
-      const { matchId, oddId, stake, betOption } = req.body;
-      const userId = req.user._id; // Assumes JWT middleware sets req.user
+      const { matchId, oddId, stake} = req.body;
+      const userId = req.user._id; 
 
       // Validate inputs
       if (!matchId || !oddId || !stake) {
         throw new CustomError(
-          "Missing required fields: matchId, oddId, stake, ",
+          "Missing required fields: matchId, oddId, stake",
           400,
           "INVALID_INPUT"
         );
