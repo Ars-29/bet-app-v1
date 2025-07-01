@@ -25,7 +25,7 @@ class FixtureOptimizationService {
       limit = 50,
       leagues = [],
       dateFrom,
-
+      per_page = 50,
       dateTo,
       states = [1], // 1 = not started, 2 = live, 3 = finished
       includeOdds = true,
@@ -39,6 +39,7 @@ class FixtureOptimizationService {
       dateTo,
       states,
       includeOdds,
+      per_page,
     })}`;
 
     // Check cache first
@@ -60,6 +61,7 @@ class FixtureOptimizationService {
         dateTo,
         states,
         includeOdds,
+        per_page,
       });
 
       console.log("🔍 Optimized API params:", apiParams);
@@ -76,6 +78,8 @@ class FixtureOptimizationService {
       //TODO: Transform and optimize the data
       // const optimizedData = this.transformFixturesData(response.data, options);
       const optimizedData = response.data;
+      console.log(response.data.length);
+
       // Cache the result
       this.fixtureCache.set(cacheKey, optimizedData);
       return optimizedData;
@@ -97,7 +101,7 @@ class FixtureOptimizationService {
   }) {
     const params = {
       page,
-      per_page: Math.min(limit, 100), // SportMonks max per page
+      per_page: Math.min(limit, 50), // SportMonks max per page
     };
 
     // Build filters array for v3 API format - keep it simple like the working Postman example
@@ -320,19 +324,36 @@ class FixtureOptimizationService {
     return liveFixtures;
   }
 
-  async getUpcomingFixtures(daysAhead = 7) {
+  async getUpcomingFixtures() {
     const today = new Date();
-    const futureDate = new Date(
-      today.getTime() + daysAhead * 24 * 60 * 60 * 1000
-    );
+    const futureDate = new Date(today.getTime() + 20 * 24 * 60 * 60 * 1000); // 20 days later
+    const filterEndDate = new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000); // 10 days later
 
-    return this.getOptimizedFixtures({
+    let fixtures = await this.getOptimizedFixtures({
       dateFrom: today.toISOString().split("T")[0],
       dateTo: futureDate.toISOString().split("T")[0],
-      states: [1], // Not started
+      states: [1],
       limit: 200,
       priority: "main",
     });
+
+    //INFO: Filter to only fixtures within [today, 10 days later]
+    fixtures = fixtures.filter((fixture) => {
+      const fixtureDate = new Date(fixture.starting_at);
+      return fixtureDate >= today && fixtureDate <= filterEndDate;
+    });
+
+    //INFO: Group fixtures by league name
+    const groupedByLeague = {};
+    fixtures.forEach((fixture) => {
+      const leagueName = fixture.league?.name || "Unknown League";
+      if (!groupedByLeague[leagueName]) {
+        groupedByLeague[leagueName] = [];
+      }
+      groupedByLeague[leagueName].push(this.transformMatchOdds(fixture));
+    });
+
+    return groupedByLeague;
   }
 
   // Get optimized homepage data
@@ -374,6 +395,7 @@ class FixtureOptimizationService {
         dateTo: footballDailyEndStr,
         states: [1],
         includeOdds: true,
+        per_page: 50,
       })}`;
 
       // Check if we have cached fixture data
@@ -866,13 +888,13 @@ class FixtureOptimizationService {
 
       try {
         const today = new Date();
-        const pastDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
-        const futureDate = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days ahead
+        const pastDate = new Date(today.getTime()); // 7 days ago
+        const futureDate = new Date(today.getTime() + 20 * 24 * 60 * 60 * 1000); // 30 days ahead
 
         const apiResponse = await this.getOptimizedFixtures({
           dateFrom: pastDate.toISOString().split("T")[0],
           dateTo: futureDate.toISOString().split("T")[0],
-          states: [1, 2, 3],
+          states: [1],
           includeOdds,
           limit: 500,
         });

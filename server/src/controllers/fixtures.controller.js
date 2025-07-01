@@ -85,19 +85,14 @@ export const getLiveFixtures = asyncHandler(async (req, res) => {
 
 // Get upcoming fixtures
 export const getUpcomingFixtures = asyncHandler(async (req, res) => {
-  const { days = 7 } = req.query;
-  const daysAhead = Math.min(parseInt(days), 14); // Limit to 2 weeks
-
-  const fixtures = await fixtureOptimizationService.getUpcomingFixtures(
-    daysAhead
-  );
+  const fixtures = await fixtureOptimizationService.getUpcomingFixtures();
 
   res.status(200).json({
     success: true,
     message: "Upcoming fixtures fetched successfully",
     data: fixtures,
     count: fixtures.length,
-    days_ahead: daysAhead,
+
     timestamp: new Date().toISOString(),
   });
 });
@@ -243,14 +238,14 @@ export const getMatchById = asyncHandler(async (req, res) => {
 // Get matches by league ID
 export const getMatchesByLeague = asyncHandler(async (req, res) => {
   const { leagueId } = req.params;
-  const {fixtures,league }= await fixtureOptimizationService.getMatchesByLeague(leagueId);
-
+  const { fixtures, league } =
+    await fixtureOptimizationService.getMatchesByLeague(leagueId);
 
   res.status(200).json({
     success: true,
     message: `Matches for league ${leagueId} fetched successfully`,
     data: fixtures,
-    league:league,
+    league: league,
     count: fixtures.length,
     timestamp: new Date().toISOString(),
   });

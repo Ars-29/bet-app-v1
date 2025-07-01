@@ -27,6 +27,7 @@ fixturesRouter.get("/leagues/popular", getPopularLeagues);
 
 // Test endpoint to compare optimization
 fixturesRouter.get("/:matchId", getMatchById);
+fixturesRouter.get("/upcoming", getUpcomingFixtures);
 
 // Add new route for matches by league
 fixturesRouter.get("/league/:leagueId", getMatchesByLeague);
