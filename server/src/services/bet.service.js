@@ -4,7 +4,7 @@ import MatchOdds from "../models/matchOdds.model.js";
 import SportsMonksService from "./sportsMonks.service.js";
 import FixtureOptimizationService from "./fixture.service.js";
 import { CustomError } from "../utils/customErrors.js";
-import cron from "node-cron";
+import agenda from "../config/agenda.js";
 
 class BetService {
   async placeBet(userId, matchId, oddId, stake) {
@@ -169,50 +169,14 @@ class BetService {
     };
   }
 
-  //TODO: Check working on a real match
   scheduleBetOutcomeCheck(betId, estimatedMatchEnd, matchId) {
-    console.log("Estimated match end", estimatedMatchEnd.getTime());
-
-    const scheduleTime = estimatedMatchEnd;
-    // new Date(estimatedMatchEnd.getTime() + 5 * 60 * 1000); // 5 minutes after
-    const cronTime = `${scheduleTime.getMinutes()} ${scheduleTime.getHours()} ${scheduleTime.getDate()} ${
-      scheduleTime.getMonth() + 1
-    } *`;
-
-    cron.schedule(
-      cronTime,
-      async () => {
-        try {
-          // Check cache first
-          console.log("RUNNING THE JOB AFTER 2 mins ");
-
-          const cacheKey = `match_${matchId}`;
-          let match = FixtureOptimizationService.fixtureCache.get(cacheKey);
-          if (match && match.state?.id === 5) {
-            console.log(`Using cached match result for match ${matchId}`);
-          } else {
-            match = await this.fetchMatchResult(matchId);
-            if (match.state?.id === 5) {
-              FixtureOptimizationService.fixtureCache.set(
-                cacheKey,
-                match,
-                24 * 3600
-              ); // Cache for 24 hours
-            }
-          }
-          await this.checkBetOutcome(betId, match);
-          console.log(
-            `Bet ${betId} outcome checked at ${new Date().toISOString()}`
-          );
-        } catch (error) {
-          console.error(`Error checking bet ${betId} outcome:`, error);
-        }
-      },
-      {
-        scheduled: true,
-        timezone: "UTC",
-      }
+    // Schedule with Agenda for 1 minute after bet placement
+    const runAt = new Date(Date.now() + 1 * 60 * 1000); // 1 minute from now
+    console.log(
+      `[scheduleBetOutcomeCheck] Now: ${new Date().toISOString()}, runAt: ${runAt.toISOString()} (should be 1 minute later)`
     );
+    agenda.schedule(runAt, "checkBetOutcome", { betId, matchId });
+    console.log(`Scheduled Agenda job for bet ${betId} at ${runAt}`);
   }
 
   async fetchMatchResult(matchId) {
@@ -230,33 +194,67 @@ class BetService {
   }
 
   async checkBetOutcome(betId, match = null) {
+    console.log(`[checkBetOutcome] Called for betId: ${betId}`);
     const bet = await Bet.findById(betId).populate("userId");
+    if (!bet.oddId) {
+      console.log(bet);
+      return null;
+    }
     if (!bet) {
+      console.error(`[checkBetOutcome] Bet not found: ${betId}`);
       throw new CustomError("Bet not found", 404, "BET_NOT_FOUND");
     }
 
     let matchData = match;
     if (!matchData) {
-      const cacheKey = `match_${bet.matchId}`;
-      matchData = FixtureOptimizationService.fixtureCache.get(cacheKey);
-      if (!matchData || matchData.state?.id !== 5) {
+      // Always fetch the latest fixture with odds from the API
+      try {
+        console.log(
+          `[checkBetOutcome] Fetching latest fixture for matchId: ${bet.matchId}`
+        );
         matchData = await this.fetchMatchResult(bet.matchId);
-        if (matchData.state?.id === 5) {
-          FixtureOptimizationService.fixtureCache.set(
-            cacheKey,
-            matchData,
-            24 * 3600
-          );
-        }
+        // if (matchData.state?.id === 5) {
+        //   // Cache finished match
+        //   FixtureOptimizationService.fixtureCache.set(
+        //     `match_${bet.matchId}`,
+        //     matchData,
+        //     24 * 3600
+        //   );
+        // }
+      } catch (err) {
+        console.error(`[checkBetOutcome] Error fetching match:`, err);
+        throw err;
       }
     }
 
-    if (matchData.state.id !== 5) {
-      return { betId, status: bet.status, message: "Match not yet finished" };
-    }
+    console.log(`[checkBetOutcome] Match state:`, matchData.state);
+    // if (!matchData.state || matchData.state.id !== 5) {
+    //   console.log(
+    //     `[checkBetOutcome] Match not finished for betId: ${betId}, state:`,
+    //     matchData.state
+    //   );
+    //   // Reschedule for 2 minutes later
+    //   const runAt = new Date(Date.now() + 2 * 60 * 1000);
+    //   agenda.schedule(runAt, "checkBetOutcome", {
+    //     betId,
+    //     matchId: bet.matchId,
+    //   });
+    //   return {
+    //     betId,
+    //     status: bet.status,
+    //     message: "Match not yet finished, rescheduled",
+    //   };
+    // }
 
-    const selectedOdd = matchData.odds?.find((odd) => odd.id === bet.oddId);
+    // Always search for the oddId in the fresh odds from the API
+
+    const selectedOdd = matchData.odds?.find((odd) => odd.id == bet.oddId);
+
+    console.log(`[checkBetOutcome] selectedOdd:`, selectedOdd);
     if (!selectedOdd) {
+      console.error(
+        `[checkBetOutcome] Odd ID not found in match data for betId: ${bet.oddId}`
+      );
       throw new CustomError(
         "Odd ID not found in match data",
         404,
@@ -267,6 +265,9 @@ class BetService {
     if ("winning" in selectedOdd) {
       bet.status = selectedOdd.winning ? "won" : "lost";
       bet.payout = selectedOdd.winning ? bet.stake * bet.odds : 0;
+      console.log(
+        `[checkBetOutcome] Set status (winning in selectedOdd): ${bet.status}`
+      );
     } else {
       const homeGoals =
         matchData.scores.find(
@@ -297,6 +298,9 @@ class BetService {
           bet.status = "lost";
           bet.payout = 0;
         }
+        console.log(
+          `[checkBetOutcome] Set status (market_id 1): ${bet.status}`
+        );
       } else if (selectedOdd.market_id === "8") {
         const totalGoals = homeGoals + awayGoals;
         const threshold = parseFloat(bet.betOption.split(" ")[1]);
@@ -310,9 +314,13 @@ class BetService {
           bet.status = "lost";
           bet.payout = 0;
         }
+        console.log(
+          `[checkBetOutcome] Set status (market_id 8): ${bet.status}`
+        );
       } else {
         bet.status = "canceled";
         bet.payout = 0;
+        console.log(`[checkBetOutcome] Set status (other market): canceled`);
       }
     }
 
@@ -320,13 +328,23 @@ class BetService {
       const user = bet.userId;
       user.balance += bet.payout;
       await user.save();
+      console.log(
+        `[checkBetOutcome] User ${user._id} balance updated for win: +${bet.payout}`
+      );
     } else if (bet.status === "canceled") {
       const user = bet.userId;
       user.balance += bet.stake;
       await user.save();
+      console.log(
+        `[checkBetOutcome] User ${user._id} balance refunded for canceled bet: +${bet.stake}`
+      );
     }
 
+    console.log(`[checkBetOutcome] Saving bet with status: ${bet.status}`);
     await bet.save();
+    console.log(
+      `[checkBetOutcome] Bet saved. betId: ${bet._id}, status: ${bet.status}`
+    );
     return {
       betId: bet._id,
       status: bet.status,
@@ -503,28 +521,10 @@ class BetService {
           for (const bet of betsByMatch[matchId]) {
             // Reschedule for 10 minutes later
             const newScheduleTime = new Date(now.getTime() + 10 * 60 * 1000);
-            const cronTime = `${newScheduleTime.getMinutes()} ${newScheduleTime.getHours()} ${newScheduleTime.getDate()} ${
-              newScheduleTime.getMonth() + 1
-            } *`;
-            cron.schedule(
-              cronTime,
-              async () => {
-                try {
-                  await this.checkBetOutcome(bet._id);
-                  console.log(
-                    `Rescheduled overdue bet ${
-                      bet._id
-                    } checked at ${new Date().toISOString()}`
-                  );
-                } catch (error) {
-                  console.error(
-                    `Error rescheduling overdue bet ${bet._id}:`,
-                    error
-                  );
-                }
-              },
-              { scheduled: true, timezone: "UTC" }
-            );
+            agenda.schedule(newScheduleTime, "checkBetOutcome", {
+              betId: bet._id,
+              matchId,
+            });
             results.push({
               betId: bet._id,
               status: bet.status,

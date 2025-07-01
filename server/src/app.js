@@ -17,6 +17,9 @@ import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import financeRoutes from "./routes/finance.routes.js";
 import betRoutes from "./routes/bet.routes.js";
+import agenda from "./config/agenda.js";
+import BetService from "./services/bet.service.js";
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -67,3 +70,35 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}`);
 });
+
+agenda.define("checkBetOutcome", async (job) => {
+  const { betId, matchId } = job.attrs.data;
+  try {
+    await BetService.checkBetOutcome(betId);
+    console.log(
+      `Bet ${betId} outcome checked by Agenda at ${new Date().toISOString()}`
+    );
+  } catch (error) {
+    console.error(`Error checking bet ${betId} outcome via Agenda:`, error);
+  }
+});
+
+agenda.on("ready", () => {
+  console.log("[Agenda] Ready and connected to MongoDB");
+});
+agenda.on("error", (err) => {
+  console.error("[Agenda] Error:", err);
+});
+agenda.on("start", (job) => {
+  console.log(`[Agenda] Job ${job.attrs.name} starting. Data:`, job.attrs.data);
+});
+agenda.on("fail", (err, job) => {
+  console.error(`[Agenda] Job ${job.attrs.name} failed:`, err);
+});
+
+agenda
+  .start()
+  .then(() => {
+    console.log("[Agenda] Started and polling for jobs.");
+  })
+  .catch(console.error);
