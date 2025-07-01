@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { X, ChevronLeft } from 'lucide-react';
+import LeagueIcon from '@/components/ui/LeagueIcon';
 
 const LeagueDropdown = ({ leagues, isOpen, onClose, currentLeagueId, triggerRef }) => {
     const dropdownRef = useRef(null);
@@ -62,7 +63,7 @@ const LeagueDropdown = ({ leagues, isOpen, onClose, currentLeagueId, triggerRef 
 
                     {/* Leagues List */}
                     <div className="divide-y divide-gray-600 animate-fadeIn">
-                        {leagues.map((league) => (
+                        {leagues && leagues.length > 0 ? leagues.map((league) => (
                             <Link
                                 key={league.id}
                                 href={`/leagues/${league.id}`}
@@ -73,25 +74,33 @@ const LeagueDropdown = ({ leagues, isOpen, onClose, currentLeagueId, triggerRef 
                                 <div className="p-4 bg-gray-800">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center space-x-3">
-                                            <span className="text-2xl">{league.icon}</span>
+                                            {league.image_path ? (
+                                                <img 
+                                                    src={league.image_path} 
+                                                    alt={league.name} 
+                                                    className="h-6 w-6 object-contain"
+                                                />
+                                            ) : (
+                                                <LeagueIcon league={{
+                                                    name: league.name,
+                                                    imageUrl: league.image_path,
+                                                    icon: "⚽"
+                                                }} />
+                                            )}
                                             <div>
                                                 <div className="text-white font-medium text-sm">
                                                     {league.name}
                                                 </div>
-                                                <div className="text-gray-400 text-xs">
-                                                    {league.matches.length} matches
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-white text-xs">
-                                                {league.day}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </Link>
-                        ))}
+                        )) : (
+                            <div className="p-4 bg-gray-800 text-white text-center">
+                                No leagues available
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>

@@ -1,32 +1,30 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronDown, Clock } from "lucide-react";
+import { ChevronLeft, ChevronDown } from "lucide-react";
 import LeagueDropdown from "./LeagueDropdown";
-import leaguesData from "@/data/dummayLeagues";
 import { useRouter } from 'next/navigation';
-import MatchCard from '../home/MatchCard';
-import MatchDropdown from '../match/MatchDropdown';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectPopularLeagues, fetchPopularLeagues } from '@/lib/features/leagues/leaguesSlice';
 
 const LeagueHeader = ({ league }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const triggerRef = useRef(null);
-
     const router = useRouter();
+    const dispatch = useDispatch();
+    const leagues = useSelector(selectPopularLeagues);
+    
+    // Fetch leagues data on component mount
+    useEffect(() => {
+        dispatch(fetchPopularLeagues());
+    }, [dispatch]);
+
     const toggleDropdown = () => {
-        
         setIsDropdownOpen(!isDropdownOpen);
     };
 
     const closeDropdown = () => {
         setIsDropdownOpen(false);
     };
-
-   
-
-    // useEffect(() => {
-    //     console.log("League Header Rendered", league);
-
-    // }, [])
 
     return (
         <div className="mb-4 bg-white p-3 w-screen">
@@ -61,7 +59,8 @@ const LeagueHeader = ({ league }) => {
                     </div>
                 </div>
 
-                <MatchDropdown
+                <LeagueDropdown
+                    leagues={leagues}
                     isOpen={isDropdownOpen}
                     onClose={closeDropdown}
                     triggerRef={triggerRef}
