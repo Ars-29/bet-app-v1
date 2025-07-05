@@ -1,8 +1,5 @@
 // Simple odds classification helper
 const classifyOdds = (oddsData) => {
-  // Log the original data structure to understand what we're working with
-  console.log("Original odds data structure:", JSON.stringify(oddsData, null, 2).substring(0, 1000) + "...");
-  
   // Define category mappings based on your frontend structure
   const categories = {
     "pre-packs": {
@@ -211,7 +208,7 @@ const classifyOdds = (oddsData) => {
     }
   });
 
-  const result = {
+  return {
     categories: [
       { id: "all", label: "All", odds_count: totalOdds },
       ...availableCategories,
@@ -222,21 +219,10 @@ const classifyOdds = (oddsData) => {
       total_odds: totalOdds,
     },
   };
-
-  // Log classification summary
-  console.log("Classification summary:", {
-    totalMarkets: Object.keys(oddsData.odds_by_market).length,
-    totalClassifiedMarkets: classifiedMarketIds.size,
-    categoriesCount: availableCategories.length,
-    categoriesWithCounts: availableCategories.map(c => `${c.label}: ${c.odds_count}`),
-  });
-
-  return result;
 };
 
 // Transform classified odds to betting data format for frontend
 const transformToBettingData = (classifiedOdds, matchData = null) => {
-  console.log("Starting transformation to betting data format");
   const bettingData = [];
 
   // Extract team names if available
@@ -249,352 +235,32 @@ const transformToBettingData = (classifiedOdds, matchData = null) => {
   Object.values(classifiedOdds.classified_odds || {}).forEach((category) => {
     Object.entries(category.markets_data || {}).forEach(([marketId, market]) => {
       // Skip if we've already processed this market
-      if (processedMarkets.has(marketId)) {
-        console.log(`Skipping duplicate market ID: ${marketId}`);
-        return;
-      }
-      
+      if (processedMarkets.has(marketId)) return;
       processedMarkets.add(marketId);
 
-      // Check if this is a player-specific market
-      const isPlayerMarket = ['player-cards', 'player-shots', 'player-shots-on-target', 'player-goals', 'goal-scorer'].includes(category.id);
-      const isSpecialMarket = category.id === 'specials';
-      const marketDescription = market.market_description || '';
-      
-      // Transform market to betting data format
-      const bettingSection = {
-        id: `market-${market.market_id}`,
-        title: market.market_description,
-        type: market.market_description.toLowerCase() === 'to score in half' ? 'to-score-in-half' : category.id,
-        category: category.id,
-        name: market.market_description.toLowerCase() === 'to score in half' ? market.odds[0]?.name : undefined,
-        options: market.odds.map((odd) => {
-          // Safely handle odds value - it might be a string or number
-          let oddsValue = odd.value;
-          if (typeof oddsValue === "string") {
-            oddsValue = parseFloat(oddsValue);
-          }
-          // Fallback to a default odds if invalid
-          if (isNaN(oddsValue) || oddsValue === null || oddsValue === undefined) {
-            oddsValue = 1.0;
-          }
+      // Filter out suspended odds
+      const activeOdds = market.odds.filter(odd => !odd.suspended);
 
-          // Replace "Home" and "Away" with actual team names in the label
-          let label = odd.label || odd.name || "Unknown";
-          
-          // For player markets, ensure player name is included in the label
-if (isPlayerMarket) {
-  // Special handling for player cards to preserve all options (Booked, 1st Card, etc.)
-  if (category.id === 'player-cards') {
-    // Keep original label if it already has player name and action type
-    if (odd.label && odd.label.includes(' - ')) {
-      label = odd.label;
-    } else {
-      // Extract player name from various fields
-      let playerName = '';
-      let playerTeam = null;
-      
-      // First try to get player name from participant info
-      if (odd.participant_name) {
-        playerName = odd.participant_name;
-        if (matchData && matchData.participants) {
-          if (odd.participant_id === matchData.participants[0].id) {
-            playerTeam = 'home';
-          } else if (odd.participant_id === matchData.participants[1].id) {
-            playerTeam = 'away';
-          }
-        }
-      }
-      
-      // If no participant name, try other fields
-      if (!playerName) {
-        if (odd.description) {
-          playerName = odd.description;
-        } else if (odd.name && odd.name !== label) {
-          playerName = odd.name;
-        }
-      }
-      
-      // If still no team but we have player name, try to match against team names
-      if (!playerTeam && playerName && matchData && matchData.participants) {
-        const homeTeam = matchData.participants[0].name;
-        const awayTeam = matchData.participants[1].name;
-        
-        if (playerName.toLowerCase().includes(homeTeam.toLowerCase())) {
-          playerTeam = 'home';
-        } else if (playerName.toLowerCase().includes(awayTeam.toLowerCase())) {
-          playerTeam = 'away';
-        }
-      }
-      
-      // If we still don't have a team, default to home team
-      if (!playerTeam) {
-        playerTeam = 'home';
-      }
-      
-      // Set the team property
-      odd.team = playerTeam;
-      
-      // Determine action type (Booked, 1st Card, etc.)
-      let actionType = label;
-      
-      // Create full label with player name and action type
-      if (playerName) {
-        label = `${playerName} - ${actionType}`;
-      }
-    }
-  } else {
-              // For other player markets
-              // If player name is in the description but not in the label, add it
-              if (odd.description && !label.includes(odd.description)) {
-                label = `${odd.description} - ${label}`;
-              }
-              
-              // If odd.name contains a player name but label doesn't, use odd.name
-              if (odd.name && odd.name !== label && !label.includes(odd.name)) {
-                label = `${odd.name} - ${label}`;
-              }
-              
-              // If we have participant info in the odd, use it
-              if (odd.participant_name && !label.includes(odd.participant_name)) {
-                label = `${odd.participant_name} - ${label}`;
-              }
-            }
-          }
-          
-          // Replace common numeric labels with team names
-          if (matchData && matchData.participants) {
-            // Replace team references
-            label = label
-              .replace(/\bHome\b/gi, homeTeam)
-              .replace(/\bAway\b/gi, awayTeam);
-            
-            // Handle common numeric labels based on market context
-            const marketLower = marketDescription.toLowerCase();
-            const isHandicapMarket = marketLower.includes('handicap');
-            const isResultMarket = marketLower.includes('result') || marketLower.includes('winner') || marketLower.includes('outcome');
-            const isHalfMarket = marketLower.includes('half');
-            const isGoalScorerMarket = marketLower.includes('goal') || marketLower.includes('score') || category.id === 'goal-scorer';
-            const isSpecialMarket = category.id === 'specials';
-            const isOthersMarket = category.id === 'others';
-            
-            // Special handling for Half Time Correct Score
-            if (marketLower === 'half time correct score') {
-                // The name field contains the actual score (e.g., "1-0")
-                if (odd.name && odd.name.match(/^\d+-\d+$/)) {
-                    // For Half Time Correct Score, label "1" means home team, "2" means away team
-                    let teamName;
-                    if (label === "1") {
-                        teamName = homeTeam;
-                    } else if (label === "2") {
-                        teamName = awayTeam;
-                    } else if (label.toLowerCase() === "x" || label.toLowerCase() === "draw") {
-                        teamName = "Draw";
-                    } else {
-                        // If label doesn't match expected values, use default logic
-                        const [homeScore, awayScore] = odd.name.split('-');
-                        if (parseInt(homeScore) > parseInt(awayScore)) {
-                            teamName = homeTeam;
-                        } else if (parseInt(homeScore) < parseInt(awayScore)) {
-                            teamName = awayTeam;
-                        } else {
-                            teamName = "Draw";
-                        }
-                    }
-                    label = `${teamName} ${odd.name}`;
-                }
-            }
-            // Special handling for Alternative Handicap Result
-            else if ((marketLower.includes('alternative handicap') || 
-                 marketLower.includes('1st half handicap') || 
-                 marketLower.includes('first half handicap')) && 
-                odd.handicap) {
-              // Store the handicap value for display
-              odd.handicapValue = odd.handicap;
-              
-              // Format the label to include the handicap
-              if (label === "1" || label.toLowerCase() === "home" || label === homeTeam) {
-                label = `${homeTeam} ${odd.handicap}`;
-              } else if (label === "2" || label.toLowerCase() === "away" || label === awayTeam) {
-                label = `${awayTeam} ${odd.handicap}`;
-              } else if (label === "X" || label.toLowerCase() === "draw" || label.toLowerCase() === "tie") {
-                label = `Draw ${odd.handicap}`;
-              }
-              
-              // Don't add 1H indicator for half-time markets
-            }
-            // For specific markets, replace numeric labels with team names
-            else if (isResultMarket || isHandicapMarket || marketLower.includes('1x2') || 
-                (isGoalScorerMarket && (label === "1" || label === "2")) ||
-                (isSpecialMarket && (label === "1" || label === "2")) ||
-                (isOthersMarket && (label === "1" || label === "2"))) {
-              // Handle standard 1X2 notation
-              if (label === "1" || label.toLowerCase() === "home") {
-                label = homeTeam;
-              } else if (label === "2" || label.toLowerCase() === "away") {
-                label = awayTeam;
-              } else if (label === "X" || label.toLowerCase() === "draw" || label.toLowerCase() === "tie") {
-                label = "Draw";
-              }
-            }
-            
-            // Special handling for specific markets in Others category
-            if (isOthersMarket) {
-              // Draw No Bet market
-              if (marketLower.includes('draw no bet') || marketLower.includes('dnb')) {
-                if (label === "1") {
-                  label = homeTeam;
-                } else if (label === "2") {
-                  label = awayTeam;
-                }
-              }
-              
-              // Clean Sheet market
-              if (marketLower.includes('clean sheet')) {
-                if (label === "1") {
-                  label = `${homeTeam} - Yes`;
-                } else if (label === "2") {
-                  label = `${awayTeam} - Yes`;
-                }
-              }
-              
-              // Winning Margin market
-              if (marketLower.includes('winning margin') || marketLower.includes('margin of victory')) {
-                if (label === "1") {
-                  label = homeTeam;
-                } else if (label === "2") {
-                  label = awayTeam;
-                }
-              }
-            }
-            
-            // For team to score markets
-            if (marketLower.includes('team to score') || marketLower.includes('first team') || marketLower.includes('last team')) {
-              if (label === "1" || label.toLowerCase() === "home") {
-                label = homeTeam;
-              } else if (label === "2" || label.toLowerCase() === "away") {
-                label = awayTeam;
-              } else if (label.toLowerCase() === "no goal" || label.toLowerCase() === "no goals") {
-                label = "No Goal";
-              }
-            }
-            
-            // For half markets, be more specific
-            if (isHalfMarket) {
-              if (label === "1") {
-                label = `${homeTeam} (${isHalfMarket ? "Half" : ""})`;
-              } else if (label === "2") {
-                label = `${awayTeam} (${isHalfMarket ? "Half" : ""})`;
-              }
-            }
-            
-            // For over/under markets, make labels clearer
-            if (marketLower.includes('over/under') || 
-                marketLower.includes('goals') || 
-                marketLower.includes('goal line') ||
-                marketLower.includes('corners')) {
-                
-                // Special handling for Total Goals/Both Teams to Score market
-                if (marketLower === 'total goals/both teams to score') {
-                    // Keep the original label as is
-                    label = odd.label;
-                }
-                // Special handling for Team Total Goals market
-                else if (marketLower === 'team total goals') {
-                    // Extract the total value from the name or label
-                    const totalValue = odd.name || odd.total || odd.handicap || "";
-                    odd.total = totalValue;
-                    
-                    // Set the label to the team name
-                    if (label === "1" || label.toLowerCase() === "home") {
-                        label = homeTeam;
-                    } else if (label === "2" || label.toLowerCase() === "away") {
-                        label = awayTeam;
-                    }
-                }
-                else {
-                    // Get threshold from name field
-                    let threshold = odd.name || "";
-                    
-                    if (label.toLowerCase().includes('over')) {
-                        label = `Over ${threshold}`;
-                    } else if (label.toLowerCase().includes('under')) {
-                        label = `Under ${threshold}`;
-                    } else if (label.toLowerCase() === 'over') {
-                        label = `Over ${threshold}`;
-                    } else if (label.toLowerCase() === 'under') {
-                        label = `Under ${threshold}`;
-                    }
-                }
-            }
-            // Special handling for To Score In Half markets
-            else if (marketLower === 'to score in half') {
-                // The name field contains which half (1st Half/2nd Half)
-                const halfIndicator = odd.name;
-                if (halfIndicator) {
-                    // Convert to abbreviated format (1H/2H)
-                    odd.halfIndicator = halfIndicator.toLowerCase().includes('1st') ? '1H' : '2H';
-                }
-            }
-          }
-
-          return {
-            ...odd,
-            value: oddsValue,
-            label,
-            handicapValue: odd.handicap,
-            halfIndicator: odd.halfIndicator
-          };
-        }),
-      };
-      
-      // For player cards, try to extract player names from the market description if available
-      if (category.id === 'player-cards' && bettingSection.options.every(opt => !opt.label.includes(' - '))) {
-        // Log the raw data to help diagnose
-        console.log(`Player card market raw data:`, {
-          marketId,
-          description: market.market_description,
-          sampleOdds: market.odds.slice(0, 2).map(o => ({
-            label: o.label,
-            name: o.name,
-            description: o.description,
-            participant_name: o.participant_name
+      // Only create a section if there are active odds
+      if (activeOdds.length > 0) {
+        const section = {
+          category: category.id,
+          title: market.market_description || category.label,
+          options: activeOdds.map(odd => ({
+            id: odd.id,
+            label: odd.label,
+            value: parseFloat(odd.value),
+            team: odd.team || null,
+            suspended: odd.suspended || false,
+            marketId: marketId
           }))
-        });
-        
-        // Group options by their label to create more meaningful labels
-        const groupedOptions = [];
-        const labelGroups = {};
-        
-        bettingSection.options.forEach(option => {
-          if (!labelGroups[option.label]) {
-            labelGroups[option.label] = [];
-          }
-          labelGroups[option.label].push(option);
-        });
-        
-        // Create new sections for each unique label
-        Object.entries(labelGroups).forEach(([label, options], index) => {
-          if (options.length > 0) {
-            const playerSection = {
-              ...bettingSection,
-              id: `${bettingSection.id}-${index}`,
-              title: `${bettingSection.title} - Group ${index + 1}`,
-              options: options
-            };
-            bettingData.push(playerSection);
-          }
-        });
-        
-        // Skip adding the original section since we've created grouped sections
-        return;
+        };
+
+        bettingData.push(section);
       }
-      
-      bettingData.push(bettingSection);
     });
   });
 
-  console.log(`Transformed ${bettingData.length} betting sections from ${processedMarkets.size} unique markets`);
   return bettingData;
 };
 

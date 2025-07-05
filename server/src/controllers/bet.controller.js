@@ -1,5 +1,6 @@
 import BetService from "../services/bet.service.js";
 import { CustomError } from "../utils/customErrors.js";
+import FixtureOptimizationService from "../services/fixture.service.js";
 
 class BetController {
   async placeBet(req, res, next) {
@@ -24,7 +25,11 @@ class BetController {
         );
       }
 
-      const result = await BetService.placeBet(userId, matchId, oddId, stake, betOption);
+      // Check if the match is live
+      const isLive = FixtureOptimizationService.liveFixturesService.isMatchLive(matchId);
+      console.log(`Match ${matchId} is live: ${isLive}`);
+
+      const result = await BetService.placeBet(userId, matchId, oddId, stake, betOption, isLive);
       res.status(201).json({
         success: true,
         data: result,

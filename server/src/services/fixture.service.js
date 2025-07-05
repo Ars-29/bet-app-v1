@@ -169,11 +169,10 @@ class FixtureOptimizationService {
       return cached;
     }
 
-    console.log("🔍 Cache miss - fetching fresh popular leagues from API");
 
     try {
       // Make API call to get actual leagues
-      console.log("🔍 Fetching leagues from SportsMonks API...");
+     
 
       const response = await sportsMonksService.getLeagues();
       this.apiCallCount++;
@@ -181,9 +180,9 @@ class FixtureOptimizationService {
 
       if (response && response.length > 0) {
         // Get popular leagues from MongoDB
-        console.log("🔍 Fetching popular leagues from MongoDB...");
+      
         const popularLeaguesInDb = await League.find({}).lean();
-        console.log("📊 Popular leagues in DB:", popularLeaguesInDb);
+        
         
         const popularLeaguesMap = new Map(
           popularLeaguesInDb.map(league => [league.leagueId, league])
@@ -207,10 +206,10 @@ class FixtureOptimizationService {
           return 0;
         });
 
-        console.log("📊 Enhanced and sorted leagues:", sortedLeagues.filter(l => l.isPopular));
+        
         
         this.leagueCache.set(cacheKey, sortedLeagues);
-        console.log(`✅ Fetched ${sortedLeagues.length} leagues from API`);
+      
         return sortedLeagues;
       } else {
         throw new Error("No leagues found from API");

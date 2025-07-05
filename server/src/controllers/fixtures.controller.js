@@ -2,6 +2,7 @@ import fixtureOptimizationService from "../services/fixture.service.js";
 import { asyncHandler } from "../utils/customErrors.js";
 import FixtureOptimizationService from "../services/fixture.service.js";
 import LiveFixturesService from "../services/LiveFixtures.service.js";
+import fixtureService from '../services/fixture.service.js';
 
 // Get optimized fixtures with pagination and filtering
 
@@ -283,3 +284,13 @@ export const getAllLiveOddsMap = asyncHandler(async (req, res) => {
   const oddsMap = liveFixturesService.getAllLiveOddsMap();
   res.json(oddsMap);
 });
+
+export const getInplayOdds = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const liveOdds = await fixtureService.liveFixturesService.ensureLiveOdds(id);
+    res.json({ data: liveOdds });
+  } catch (error) {
+    next(error);
+  }
+};

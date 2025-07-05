@@ -10,15 +10,61 @@ class LiveFixturesService {
     this.liveOddsCache = new NodeCache({ stdTTL: 180 }); // 3 minutes
   }
 
+  // Helper method to properly parse starting_at field (same as in bet.service.js)
+  parseMatchStartTime(startingAt) {
+    if (!startingAt) return null;
+    
+    // Handle different possible formats
+    let parsedDate;
+    
+    if (typeof startingAt === 'string') {
+      // Check if the string includes timezone info
+      if (startingAt.includes('T') || startingAt.includes('Z') || startingAt.includes('+') || startingAt.includes('-') && startingAt.split('-').length > 3) {
+        // String has timezone info, parse normally
+        parsedDate = new Date(startingAt);
+      } else {
+        // String doesn't have timezone info, treat as UTC
+        // Format: "2025-07-05 09:00:00" should be treated as UTC
+        // Convert to ISO format and add Z for UTC
+        let isoString = startingAt.replace(' ', 'T');
+        if (!isoString.includes('T')) {
+          isoString = startingAt + 'T00:00:00';
+        }
+        if (!isoString.endsWith('Z')) {
+          isoString += 'Z';
+        }
+        parsedDate = new Date(isoString);
+      }
+    } else if (startingAt instanceof Date) {
+      // If it's already a Date object
+      parsedDate = startingAt;
+    } else {
+      return null;
+    }
+    
+    // Check if the date is valid
+    if (isNaN(parsedDate.getTime())) {
+      console.error(`[LiveFixtures] Invalid date created from: ${startingAt}`);
+      return null;
+    }
+    
+    return parsedDate;
+  }
+
   // Helper to group matches by league using the popular leagues cache
   bindLeaguesToMatches(matches) {
     const popularLeagues = FixtureOptimizationService.leagueCache.get("popular_leagues") || [];
+   
+    
     const leagueMap = new Map();
     for (const match of matches) {
       const leagueId = match.league_id;
+    
+      
       const foundLeague = popularLeagues.find(l => Number(l.id) === Number(leagueId));
       let league;
       if (foundLeague) {
+        
         league = {
           id: foundLeague.id,
           name: foundLeague.name,
@@ -26,19 +72,39 @@ class LiveFixturesService {
           country: typeof foundLeague.country === "string" ? foundLeague.country : foundLeague.country?.name || null,
         };
       } else {
-        league = {
-          id: leagueId,
-          name: `League ${leagueId}`,
-          imageUrl: null,
-          country: null,
-        };
+        // Try to get league info from the match itself if available
+        if (match.league && match.league.name) {
+       
+          league = {
+            id: match.league.id || leagueId,
+            name: match.league.name,
+            imageUrl: match.league.image_path || match.league.imageUrl || null,
+            country: match.league.country?.name || match.league.country || null,
+          };
+        } else {
+         
+          league = {
+            id: leagueId,
+            name: `League ${leagueId}`,
+            imageUrl: null,
+            country: null,
+          };
+        }
       }
+      
       if (!leagueMap.has(league.id)) {
         leagueMap.set(league.id, { league, matches: [] });
       }
       leagueMap.get(league.id).matches.push(match);
     }
-    return Array.from(leagueMap.values());
+    
+    const result = Array.from(leagueMap.values());
+  
+    
+
+    
+    
+    return result;
   }
 
   // Returns matches for today that have started (live)
@@ -46,8 +112,14 @@ class LiveFixturesService {
     const now = new Date();
     const cacheKeys = this.fixtureCache.keys();
     let liveMatches = [];
+    let totalMatches = 0;
+    let matchesChecked = 0;
+    
+  
+    
     for (const key of cacheKeys) {
       if (key.startsWith("fixtures_")) {
+      
         const cachedData = this.fixtureCache.get(key);
         let fixtures = [];
         if (Array.isArray(cachedData)) {
@@ -57,27 +129,56 @@ class LiveFixturesService {
         } else if (cachedData instanceof Map) {
           fixtures = Array.from(cachedData.values());
         } else {
+        
           continue;
         }
+        
+      
+        totalMatches += fixtures.length;
+        
         for (const match of fixtures) {
+          matchesChecked++;
+          
           if (!match.starting_at) {
+          
             continue;
           }
-          // Parse the starting_at field as UTC
-          let matchTime;
-          if (match.starting_at.includes('T')) {
-            matchTime = new Date(match.starting_at.endsWith('Z') ? match.starting_at : match.starting_at + 'Z');
-          } else {
-            matchTime = new Date(match.starting_at.replace(' ', 'T') + 'Z');
+          
+          // Use the proper timezone parsing helper
+          const matchTime = this.parseMatchStartTime(match.starting_at);
+          if (!matchTime) {
+         
+            continue;
           }
+          
+          // More flexible live match detection
           const matchEnd = new Date(matchTime.getTime() + 120 * 60 * 1000); // 120 minutes after start
-          if (matchTime <= now && now < matchEnd) {
+          const timeSinceStart = now.getTime() - matchTime.getTime();
+          const timeUntilEnd = matchEnd.getTime() - now.getTime();
+          
+         
+          // Check multiple conditions for live matches
+          const isStarted = matchTime <= now;
+          const isNotEnded = now < matchEnd;
+          const isLiveByTime = isStarted && isNotEnded;
+          
+          // Also check by state_id if available (2 = live, 3 = halftime, 4 = extra time)
+          const isLiveByState = match.state_id && [2, 3, 4].includes(match.state_id);
+          
+          // Consider match live if either time-based or state-based criteria are met
+          const isLive = isLiveByTime || isLiveByState;
+          
+       
+          
+          if (isLive) {
+           
             liveMatches.push(match);
           }
         }
       }
     }
-    console.log(`[LiveFixtures] Returning ${liveMatches.length} live matches at ${now.toISOString()}`);
+
+    
     const grouped = this.bindLeaguesToMatches(liveMatches).map(group => ({
       league: group.league,
       matches: group.matches.map(match => ({
@@ -85,17 +186,15 @@ class LiveFixturesService {
         odds: [], 
       })),
     }));
+    
+    console.log(`[LiveFixtures] Returning ${grouped.length} league groups with live matches`);
     return grouped;
   }
 
   // Fetch and update odds for all live matches
   async updateAllLiveOdds() {
-    console.log("🚀 updateAllLiveOdds function called");
     const liveMatches = this.getLiveMatchesFromCache();
     const apiToken = process.env.SPORTSMONKS_API_KEY;
-    
-    console.log(`🔄 Updating odds for ${liveMatches.length} live match groups`);
-    console.log(`🔑 API Token available: ${apiToken ? 'Yes' : 'No'}`);
     
     if (!apiToken) {
       console.error("❌ SPORTSMONKS_API_KEY is not set");
@@ -106,13 +205,11 @@ class LiveFixturesService {
     let successfulUpdates = 0;
     
     for (const group of liveMatches) {
-      console.log(`📋 Processing group: ${group.league?.name || 'Unknown League'}`);
       for (const match of group.matches) {
         totalMatches++;
         try {
           // Use the inplay odds endpoint
-          const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${match.id}?api_token=${apiToken}&include=`;
-          
+          const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${match.id}?api_token=${apiToken}`;
           
           const response = await axios.get(url);
           const odds = response.data?.data || [];
@@ -129,7 +226,6 @@ class LiveFixturesService {
           const betting_data = transformToBettingData(classified, match);
           // Cache only betting_data
           this.liveOddsCache.set(match.id, betting_data);
-          console.log(`✅ Updated betting_data for match ${match.id}: ${betting_data.length} betting_data`);
           successfulUpdates++;
         } catch (err) {
           console.error(`❌ Failed to update betting_data for match ${match.id}:`, err.message);
@@ -139,8 +235,6 @@ class LiveFixturesService {
         }
       }
     }
-    
-    console.log(`🎯 Total matches processed: ${totalMatches}, successful updates: ${successfulUpdates}`);
   }
 
   // Get latest betting_data for a match (from cache)
@@ -149,19 +243,108 @@ class LiveFixturesService {
     return this.liveOddsCache.get(matchId) || [];
   }
 
+  // Ensure we have live odds for a specific match
+  async ensureLiveOdds(matchId) {
+    // Check if we already have odds in cache
+    let odds = this.liveOddsCache.get(matchId);
+    if (odds && odds.length > 0) {
+      return odds;
+    }
+
+    // If not in cache, fetch them
+    const apiToken = process.env.SPORTSMONKS_API_KEY;
+    if (!apiToken) {
+      throw new CustomError("API key not configured", 500, "API_KEY_MISSING");
+    }
+
+    try {
+      const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${matchId}?api_token=${apiToken}`;
+      const response = await axios.get(url);
+      const oddsData = response.data?.data || [];
+
+      // Group odds by market for classification
+      const odds_by_market = {};
+      for (const odd of oddsData) {
+        if (!odd.market_id) continue;
+        if (!odds_by_market[odd.market_id]) {
+          odds_by_market[odd.market_id] = {
+            market_id: odd.market_id,
+            market_description: odd.market_description,
+            odds: []
+          };
+        }
+        // Preserve the original odd ID and other important fields
+        odds_by_market[odd.market_id].odds.push({
+          ...odd,
+          id: odd.id, // Ensure ID is preserved
+          value: odd.value,
+          label: odd.label,
+          name: odd.name || odd.label,
+          suspended: odd.suspended,
+          stopped: odd.stopped
+        });
+        odds_by_market[odd.market_id].market_description = odd.market_description;
+      }
+
+      const classified = classifyOdds({ odds_by_market });
+      const betting_data = transformToBettingData(classified);
+
+      // Cache the betting data
+      this.liveOddsCache.set(matchId, betting_data);
+      return betting_data;
+    } catch (err) {
+      console.error('Error fetching live odds:', err);
+      throw new CustomError("Failed to fetch live odds", 500, "LIVE_ODDS_FETCH_ERROR");
+    }
+  }
+
   // Extract only 1, X, 2 odds for inplay display
-  extractMainOdds(odds) {
-    if (!Array.isArray(odds) || odds.length === 0) {
+  extractMainOdds(bettingData) {
+    if (!Array.isArray(bettingData) || bettingData.length === 0) {
       return {};
     }
-    const homeOdd = odds.find(o => o.label?.toLowerCase() === "home" || o.label === "1");
-    const drawOdd = odds.find(o => o.label?.toLowerCase() === "draw" || o.label === "X");
-    const awayOdd = odds.find(o => o.label?.toLowerCase() === "away" || o.label === "2");
+    
+    // Look for the Full Time Result section in betting data
+    const fullTimeSection = bettingData.find(section => 
+      section.category === 'full-time' && 
+      (section.title?.toLowerCase().includes('result') || 
+       section.title?.toLowerCase().includes('fulltime') ||
+       section.title?.toLowerCase().includes('1x2'))
+    );
+    
+    if (!fullTimeSection || !fullTimeSection.options) {
+      return {};
+    }
+    
+    // Extract home, draw, away odds from the options
+    const homeOdd = fullTimeSection.options.find(o => 
+      o.label === "1" || 
+      o.label?.toLowerCase() === "home" ||
+      o.team === "home" ||
+      // Check if label contains team name (after transformation)
+      (o.label && !o.label.toLowerCase().includes('draw') && !o.label.toLowerCase().includes('tie'))
+    );
+    
+    const drawOdd = fullTimeSection.options.find(o => 
+      o.label === "X" || 
+      o.label?.toLowerCase() === "draw" ||
+      o.label?.toLowerCase() === "tie"
+    );
+    
+    const awayOdd = fullTimeSection.options.find(o => 
+      o.label === "2" || 
+      o.label?.toLowerCase() === "away" ||
+      o.team === "away" ||
+      // For the third option that's not home or draw
+      (o !== homeOdd && o !== drawOdd && o.label && !o.label.toLowerCase().includes('draw') && !o.label.toLowerCase().includes('tie'))
+    );
+
     const result = {
-      home: homeOdd ? { value: homeOdd.value, oddId: homeOdd.id } : undefined,
-      draw: drawOdd ? { value: drawOdd.value, oddId: drawOdd.id } : undefined,
-      away: awayOdd ? { value: awayOdd.value, oddId: awayOdd.id } : undefined,
+      home: homeOdd ? { value: homeOdd.value, oddId: homeOdd.id, name: homeOdd.label || 'Home Win' } : undefined,
+      draw: drawOdd ? { value: drawOdd.value, oddId: drawOdd.id, name: drawOdd.label || 'Draw' } : undefined,
+      away: awayOdd ? { value: awayOdd.value, oddId: awayOdd.id, name: awayOdd.label || 'Away Win' } : undefined,
     };
+    
     return result;
   }
 
@@ -170,6 +353,7 @@ class LiveFixturesService {
     const now = new Date();
     const cacheKeys = this.fixtureCache.keys();
     let liveMatchIds = [];
+    
     for (const key of cacheKeys) {
       if (key.startsWith("fixtures_")) {
         const cachedData = this.fixtureCache.get(key);
@@ -183,27 +367,95 @@ class LiveFixturesService {
         } else {
           continue;
         }
+        
         for (const match of fixtures) {
           if (!match.starting_at) continue;
-          let matchTime;
-          if (match.starting_at.includes('T')) {
-            matchTime = new Date(match.starting_at.endsWith('Z') ? match.starting_at : match.starting_at + 'Z');
-          } else {
-            matchTime = new Date(match.starting_at.replace(' ', 'T') + 'Z');
+          
+          // Use the proper timezone parsing helper
+          const matchTime = this.parseMatchStartTime(match.starting_at);
+          if (!matchTime) {
+            continue;
           }
+          
           const matchEnd = new Date(matchTime.getTime() + 120 * 60 * 1000);
-          if (matchTime <= now && now < matchEnd) {
+          
+          // Check multiple conditions for live matches (same as getLiveMatchesFromCache)
+          const isStarted = matchTime <= now;
+          const isNotEnded = now < matchEnd;
+          const isLiveByTime = isStarted && isNotEnded;
+          
+          // Also check by state_id if available (2 = live, 3 = halftime, 4 = extra time)
+          const isLiveByState = match.state_id && [2, 3, 4].includes(match.state_id);
+          
+          // Consider match live if either time-based or state-based criteria are met
+          const isLive = isLiveByTime || isLiveByState;
+          
+          if (isLive) {
             liveMatchIds.push(match.id);
           }
         }
       }
     }
+    
     // Build the betting_data map
     const bettingDataMap = {};
     for (const matchId of liveMatchIds) {
       bettingDataMap[matchId] = this.liveOddsCache.get(matchId) || [];
     }
+    
+    console.log(`[LiveFixtures] getAllLiveOddsMap found ${liveMatchIds.length} live matches`);
     return bettingDataMap;
+  }
+
+  // Debug method to get all matches and their states
+
+  // Check if a specific match is live
+  isMatchLive(matchId) {
+    const now = new Date();
+    const cacheKeys = this.fixtureCache.keys();
+    
+    for (const key of cacheKeys) {
+      if (key.startsWith("fixtures_")) {
+        const cachedData = this.fixtureCache.get(key);
+        let fixtures = [];
+        if (Array.isArray(cachedData)) {
+          fixtures = cachedData;
+        } else if (cachedData && Array.isArray(cachedData.data)) {
+          fixtures = cachedData.data;
+        } else if (cachedData instanceof Map) {
+          fixtures = Array.from(cachedData.values());
+        } else {
+          continue;
+        }
+        
+        const match = fixtures.find(m => m.id == matchId || m.id === parseInt(matchId));
+        if (match) {
+          if (!match.starting_at) {
+            return false;
+          }
+          
+          const matchTime = this.parseMatchStartTime(match.starting_at);
+          if (!matchTime) {
+            return false;
+          }
+          
+          const matchEnd = new Date(matchTime.getTime() + 120 * 60 * 1000); // 120 minutes after start
+          
+          // Check multiple conditions for live matches
+          const isStarted = matchTime <= now;
+          const isNotEnded = now < matchEnd;
+          const isLiveByTime = isStarted && isNotEnded;
+          
+          // Also check by state_id if available (2 = live, 3 = halftime, 4 = extra time)
+          const isLiveByState = match.state_id && [2, 3, 4].includes(match.state_id);
+          
+          // Consider match live if either time-based or state-based criteria are met
+          return isLiveByTime || isLiveByState;
+        }
+      }
+    }
+    
+    return false;
   }
 }
 

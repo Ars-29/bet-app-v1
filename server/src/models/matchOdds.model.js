@@ -7,6 +7,10 @@ const matchOddsSchema = new mongoose.Schema(
       required: [true, "Match ID is required"],
       index: true,
     },
+    starting_at: {
+      type: Date,
+      required: [true, "Match start time is required"],
+    },
     odds: [
       {
         oddId: { type: String, required: true },
@@ -15,6 +19,17 @@ const matchOddsSchema = new mongoose.Schema(
         value: { type: Number, required: true },
       },
     ],
+    participants: [
+      {
+        id: { type: String },
+        name: { type: String },
+        image_path: { type: String },
+      },
+    ],
+    state: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     updatedAt: {
       type: Date,
       default: Date.now,

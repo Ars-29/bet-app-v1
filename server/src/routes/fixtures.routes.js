@@ -10,6 +10,7 @@ import {
   getLiveMatchesFromCache,
   updateLeaguePopularity,
   getAllLiveOddsMap,
+  getInplayOdds,
 } from "../controllers/fixtures.controller.js";
 
 import { authenticateToken, requireAdmin } from "../middlewares/auth.js";
@@ -56,5 +57,7 @@ fixturesRouter.post('/leagues/popular', authenticateToken, updateLeaguePopularit
 //   requireRole(["admin"]),
 //   preloadData
 // );
+
+fixturesRouter.get("/:id/inplay-odds", getInplayOdds);
 
 export default fixturesRouter;

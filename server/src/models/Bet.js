@@ -59,6 +59,10 @@ const betSchema = new mongoose.Schema(
       required: [true, "Selection is required"],
       trim: true,
     },
+    inplay: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
