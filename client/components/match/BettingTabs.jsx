@@ -15,93 +15,65 @@ const BettingTabs = ({ matchData }) => {
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(true)
 
-
-
-
-    //INFO: Use the backend-provided betting data directly
+    // Get the betting data and classification
     const bettingData = matchData?.betting_data || [];
-    const categories = matchData?.odds_classification?.categories || [{ id: 'all', label: 'All', odds_count: 0 }];
-    const hasData = bettingData.length > 0;
+    const classification = matchData?.odds_classification || {
+        categories: [{ id: 'all', label: 'All', odds_count: 0 }],
+        classified_odds: {},
+        stats: { total_categories: 0, total_odds: 0 }
+    };
+
+    // Use the categories from classification, sorted by priority
+    const categories = useMemo(() => {
+        const cats = classification.categories || [];
+        return [...cats].sort((a, b) => (a.priority || 99) - (b.priority || 99));
+    }, [classification]);
+
+    // Create tabs array with "All" and categories
+    const tabs = useMemo(() => [
+        { id: "all", label: "All" },
+        ...categories.filter(cat => cat.id !== 'all').map(cat => ({
+            id: cat.id,
+            label: cat.label,
+            odds_count: cat.odds_count
+        }))
+    ], [categories]);
 
     // Helper function to get data by category
     const getDataByCategory = useCallback((categoryId) => {
         if (categoryId === 'all') {
-            // For 'all', group by category for accordion display
-            // Create a map of categories to avoid duplicates
-            const categoryMap = new Map();
-            
-            // First, process all betting data and organize by category
-            bettingData.forEach(item => {
-                // Filter out options that are suspended or stopped
-                const activeOptions = item.options?.filter(opt => !opt.suspended && !opt.stopped) || [];
-                
-                // Only process markets that have active options
-                if (activeOptions.length === 0) return;
-
-                const categoryId = item.category;
-                if (!categoryMap.has(categoryId)) {
-                    categoryMap.set(categoryId, {
-                        id: categoryId,
-                        label: categories.find(cat => cat.id === categoryId)?.label || categoryId,
-                        markets: [],
-                        marketIds: new Set()
-                    });
-                }
-                
-                const categoryData = categoryMap.get(categoryId);
-                // Only add the market if it hasn't been added before
-                if (!categoryData.marketIds.has(item.id)) {
-                    categoryData.markets.push({
-                        ...item,
-                        options: activeOptions // Use only active options
-                    });
-                    categoryData.marketIds.add(item.id);
-                }
-            });
-            
-            // Convert map to array and calculate totals
-            return Array.from(categoryMap.values())
-                .map(category => ({
-                    id: category.id,
-                    label: category.label,
-                    markets: category.markets,
-                    totalMarkets: category.markets.length
-                }))
-                .filter(group => group.markets.length > 0);
+            // For 'all', use the categories structure
+            return categories
+                .filter(cat => cat.id !== 'all')
+                .map(category => {
+                    const categoryMarkets = bettingData.filter(item => 
+                        item.category === category.id && item.options?.length > 0
+                    );
+                    return {
+                        id: category.id,
+                        label: category.label,
+                        markets: [...categoryMarkets], // Create a copy here too
+                        totalMarkets: categoryMarkets.length,
+                        priority: category.priority
+                    };
+                })
+                .filter(group => group.markets.length > 0)
+                .sort((a, b) => (a.priority || 99) - (b.priority || 99));
         }
-        
-        // For other tabs, just return the betting data for that category
-        // Also ensure no duplicates and filter suspended odds
-        const marketIds = new Set();
-        const filteredMarkets = bettingData
-            .filter(item => item.category === categoryId)
-            .map(item => ({
-                ...item,
-                options: item.options?.filter(opt => !opt.suspended && !opt.stopped) || []
-            }))
-            .filter(item => {
-                if (marketIds.has(item.id) || item.options.length === 0) return false;
-                marketIds.add(item.id);
-                return true;
-            });
-            
-        return [{
+
+        // For specific category, filter and sort by priority
+        const categoryMarkets = bettingData.filter(item => 
+            item.category === categoryId && item.options?.length > 0
+        );
+
+        return categoryMarkets.length ? [{
             id: categoryId,
             label: categories.find(cat => cat.id === categoryId)?.label || categoryId,
-            markets: filteredMarkets,
-            totalMarkets: filteredMarkets.length
-        }];
+            markets: [...categoryMarkets], // Create a copy here too
+            totalMarkets: categoryMarkets.length,
+            priority: categories.find(cat => cat.id === categoryId)?.priority
+        }] : [];
     }, [bettingData, categories]);
-
-
-
-    const tabs = useMemo(() => [
-        { id: "all", label: "All" },
-        ...categories.filter(cat => cat.id !== "all").map(cat => ({
-            id: cat.id,
-            label: cat.label
-        }))
-    ], [categories])
 
     // Check scroll state
     const checkScrollState = useCallback(() => {

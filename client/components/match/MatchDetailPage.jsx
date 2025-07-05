@@ -193,7 +193,14 @@ const MatchDetailPage = ({ matchId }) => {
     // For non-live matches: Show pre-match odds
     const bettingData = isLive 
         ? liveOdds || [] // For live matches, only show live odds or empty array if none available
-        : matchData.betting_data; // For non-live matches, show pre-match odds
+        : matchData.betting_data || []; // Try betting_data first
+
+    // Get the odds classification data
+    const oddsClassification = matchData.odds_classification || {
+        categories: [{ id: 'all', label: 'All', odds_count: 0 }],
+        classified_odds: {},
+        stats: { total_categories: 0, total_odds: 0 }
+    };
 
     // Show no betting options message only if there are truly no odds available
     if (!bettingData || bettingData.length === 0) {
@@ -223,7 +230,13 @@ const MatchDetailPage = ({ matchId }) => {
             <div className="lg:mr-80 xl:mr-96">
                 <div className="p-2 sm:p-3 md:p-4">
                     <MatchHeader matchData={matchData} />
-                    <BettingTabs matchData={{ ...matchData, betting_data: bettingData }} />
+                    <BettingTabs 
+                        matchData={{ 
+                            ...matchData, 
+                            betting_data: bettingData,
+                            odds_classification: oddsClassification 
+                        }} 
+                    />
                 </div>
             </div>
 
