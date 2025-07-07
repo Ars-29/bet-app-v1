@@ -209,7 +209,7 @@ class LiveFixturesService {
         totalMatches++;
         try {
           // Use the inplay odds endpoint
-          const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${match.id}?api_token=${apiToken}`;
+          const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${match.id}?api_token=${apiToken}&include=odds&filters=bookmakers:2`;
           
           const response = await axios.get(url);
           const odds = response.data?.data || [];
@@ -258,7 +258,7 @@ class LiveFixturesService {
     }
 
     try {
-      const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${matchId}?api_token=${apiToken}`;
+      const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${matchId}?api_token=${apiToken}&include=odds&filters=bookmakers:2`;
       const response = await axios.get(url);
       const oddsData = response.data?.data || [];
 

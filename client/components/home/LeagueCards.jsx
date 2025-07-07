@@ -218,7 +218,7 @@ const LeagueCards = ({
      
     };
 
-    const transformed = transformReduxData(reduxData);
+    const transformed = transformReduxData(reduxData).filter(league=>league.matches.length > 0);
     console.log("Transformed leagues for LeagueCards:", transformed);
 
     if (!transformed || transformed.length === 0) return null;

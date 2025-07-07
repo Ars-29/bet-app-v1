@@ -12,6 +12,7 @@ const HomePage = () => {
     const loading = useSelector(selectHomeLoading);
     const error = useSelector(selectHomeError);
     const footballDaily = useSelector(selectFootballDaily);
+    const filteredFootballDaily = footballDaily.filter(league => league.matches.length > 0 && league.matches.filter(match=>match.odds_main.length ));
 
     // Live matches state
     const liveMatches = useSelector(selectLiveMatches);
@@ -62,7 +63,7 @@ const HomePage = () => {
                         <LeagueCards
                             title="Football Daily"
                             useReduxData={true}
-                            reduxData={footballDaily}
+                            reduxData={filteredFootballDaily}
                             isInPlay={false}
                             showDayTabs={true}
                             viewAllText="View All Football Daily"

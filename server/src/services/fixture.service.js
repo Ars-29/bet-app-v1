@@ -79,6 +79,7 @@ class FixtureOptimizationService {
       while (pageUrl) {
         let params = {
           include: "odds;participants",
+          filters: "bookmakers:2",
           per_page: 50,
           page: page,
         };
@@ -92,10 +93,7 @@ class FixtureOptimizationService {
         const pagination = response.data?.pagination;
         if (pagination && pagination.has_more && pagination.next_page) {
           page++;
-
-          if (page == 3) {
-            pageUrl = null;
-          }
+         
         } else {
           pageUrl = null;
         }
@@ -148,6 +146,7 @@ class FixtureOptimizationService {
               market_description: odd.market_description,
               winning: odd.winning,
               probability: odd.probability,
+              handicap: odd.handicap,
             }))
           : [],
       };

@@ -16,7 +16,6 @@ const BettingTabs = ({ matchData }) => {
     const [canScrollRight, setCanScrollRight] = useState(true)
 
     // Get the betting data and classification
-    const bettingData = matchData?.betting_data || [];
     const classification = matchData?.odds_classification || {
         categories: [{ id: 'all', label: 'All', odds_count: 0 }],
         classified_odds: {},
@@ -41,39 +40,77 @@ const BettingTabs = ({ matchData }) => {
 
     // Helper function to get data by category
     const getDataByCategory = useCallback((categoryId) => {
+        const classifiedOdds = classification.classified_odds || {};
+        
         if (categoryId === 'all') {
-            // For 'all', use the categories structure
-            return categories
-                .filter(cat => cat.id !== 'all')
-                .map(category => {
-                    const categoryMarkets = bettingData.filter(item => 
-                        item.category === category.id && item.options?.length > 0
-                    );
+            // For 'all', use all categories from classified_odds
+            return Object.entries(classifiedOdds)
+                .filter(([id]) => id !== 'all')
+                .map(([id, category]) => {
+                    // Convert markets_data object into array of markets
+                    const markets = Object.entries(category.markets_data || {}).map(([marketId, marketData]) => ({
+                        id: marketId,
+                        title: marketData.market_description,
+                        type: marketData.market_id.toString(),
+                        options: marketData.odds?.map(odd => ({
+                            id: odd.id,
+                            label: odd.label,
+                            value: odd.value,
+                            name: odd.name,
+                            team: odd.team,
+                            suspended: odd.suspended,
+                            marketId: odd.market_id,
+                            marketDescription: odd.market_description,
+                            probability: odd.probability,
+                            winning: odd.winning,
+                            handicap: odd.handicap
+                        }))
+                    }));
+
                     return {
-                        id: category.id,
+                        id,
                         label: category.label,
-                        markets: [...categoryMarkets], // Create a copy here too
-                        totalMarkets: categoryMarkets.length,
+                        markets,
+                        totalMarkets: markets.length,
                         priority: category.priority
                     };
                 })
-                .filter(group => group.markets.length > 0)
+                .filter(group => group.markets?.length > 0)
                 .sort((a, b) => (a.priority || 99) - (b.priority || 99));
         }
 
-        // For specific category, filter and sort by priority
-        const categoryMarkets = bettingData.filter(item => 
-            item.category === categoryId && item.options?.length > 0
-        );
+        // For specific category
+        const categoryData = classifiedOdds[categoryId];
+        if (!categoryData?.markets_data) return [];
 
-        return categoryMarkets.length ? [{
+        // Convert markets_data object into array of markets
+        const markets = Object.entries(categoryData.markets_data || {}).map(([marketId, marketData]) => ({
+            id: marketId,
+            title: marketData.market_description,
+            type: marketData.market_id.toString(),
+            options: marketData.odds?.map(odd => ({
+                id: odd.id,
+                label: odd.label,
+                value: odd.value,
+                name: odd.name,
+                team: odd.team,
+                suspended: odd.suspended,
+                marketId: odd.market_id,
+                marketDescription: odd.market_description,
+                probability: odd.probability,
+                winning: odd.winning,
+                handicap: odd.handicap
+            }))
+        }));
+
+        return [{
             id: categoryId,
-            label: categories.find(cat => cat.id === categoryId)?.label || categoryId,
-            markets: [...categoryMarkets], // Create a copy here too
-            totalMarkets: categoryMarkets.length,
-            priority: categories.find(cat => cat.id === categoryId)?.priority
-        }] : [];
-    }, [bettingData, categories]);
+            label: categoryData.label,
+            markets,
+            totalMarkets: markets.length,
+            priority: categoryData.priority
+        }];
+    }, [classification.classified_odds]);
 
     // Check scroll state
     const checkScrollState = useCallback(() => {
@@ -275,12 +312,13 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
         // Use appropriate grid class based on market type
         const gridClass = isGoalScorerMarket && options.length === 3 ? "grid-cols-3" : getGridClass(options);
         
-        console.log('Section:', section); // Debug log
-        console.log('Options:', options); // Debug log
+        
         
         return (
             <div className={`grid ${gridClass} gap-1`}>
                 {options.map((option, idx) => (
+                    console.log("OPTIONS :", option ),
+                    
                     <BettingOptionButton
                         key={`${option.label}-${idx}`}
                         label={option.label}
@@ -293,7 +331,7 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
                         isHalfTimeOption={isHalfTimeMarket}
                         isOverUnderOption={isOverUnderMarket}
                         isGoalScorerOption={isGoalScorerMarket}
-                        handicapValue={option.handicapValue}
+                        handicapValue={option.handicap}
                         halfIndicator={option.halfIndicator}
                         thresholds={option.thresholds}
                         total={option.total}
@@ -308,125 +346,123 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
     const renderSections = (category) => {
         // For player cards, group by player name to avoid repetition
         if (category.id === 'player-cards') {
-            // Extract player names from options
-            const playerOptions = {};
-            const teamPlayers = {
-                team1: [],
-                team2: []
-            };
+            // Check if there are any player-named options (label contains ' - ')
+            const hasPlayerOptions = category.markets.some(section =>
+                section.options.some(option => option.label.includes(' - '))
+            );
+            if (hasPlayerOptions) {
+                // Existing player grouping logic
+                const playerOptions = {};
+                const teamPlayers = {
+                    team1: [],
+                    team2: []
+                };
 
-            // First pass - collect all player names and their options
-            category.markets.forEach(section => {
-                section.options.forEach(option => {
-                    // Extract player name from label (format: "Player Name - Action")
-                    const labelParts = option.label.split(' - ');
-                    if (labelParts.length >= 2) {
-                        const playerName = labelParts[0];
-                        const actionType = labelParts[1];
-                        
-                        if (!playerOptions[playerName]) {
-                            playerOptions[playerName] = {
-                                name: playerName,
-                                options: [],
-                                team: option.team || 'unknown' // Track team if available
-                            };
+                // First pass - collect all player names and their options
+                category.markets.forEach(section => {
+                    section.options.forEach(option => {
+                        // Extract player name from label (format: "Player Name - Action")
+                        const labelParts = option.label.split(' - ');
+                        if (labelParts.length >= 2) {
+                            const playerName = labelParts[0];
+                            const actionType = labelParts[1];
+                            if (!playerOptions[playerName]) {
+                                playerOptions[playerName] = {
+                                    name: playerName,
+                                    options: [],
+                                    team: option.team || 'unknown' // Track team if available
+                                };
+                            }
+                            // Add this option
+                            playerOptions[playerName].options.push({
+                                ...option,
+                                action: actionType
+                            });
                         }
-                        
-                        // Add this option
-                        playerOptions[playerName].options.push({
-                            ...option,
-                            action: actionType
-                        });
-                    }
+                    });
                 });
-            });
-            
-            // Organize players into teams if possible
-            if (matchData && matchData.participants && matchData.participants.length >= 2) {
-                const team1Name = matchData.participants[0].name;
-                const team2Name = matchData.participants[1].name;
-                
-                // Try to assign players to teams based on available data
-                Object.values(playerOptions).forEach(player => {
-                    // Check team property and player name for team assignment
-                    const playerNameLower = player.name.toLowerCase();
-                    const team1NameLower = team1Name.toLowerCase();
-                    const team2NameLower = team2Name.toLowerCase();
-                    
-                    if (player.team === 'home' || 
-                        player.team === team1Name || 
-                        playerNameLower.includes(team1NameLower)) {
-                        teamPlayers.team1.push(player);
-                    } else if (player.team === 'away' || 
-                             player.team === team2Name || 
-                             playerNameLower.includes(team2NameLower)) {
-                        teamPlayers.team2.push(player);
-                    } else {
-                        // If we can't determine team, put in team1 by default
-                        teamPlayers.team1.push(player);
-                    }
-                });
-            } else {
-                // If we don't have team data, put all players in team1
-                teamPlayers.team1 = Object.values(playerOptions);
-            }
-            
-            // Sort players by name within each team
-            teamPlayers.team1.sort((a, b) => a.name.localeCompare(b.name));
-            teamPlayers.team2.sort((a, b) => a.name.localeCompare(b.name));
-            
-            // Create sections for each team
-            const sections = [];
-            
-            // Add team1 section if it has players
-            if (teamPlayers.team1.length > 0) {
-                sections.push({
-                    id: 'team1-cards',
-                    title: matchData?.participants?.[0]?.name ? `${matchData.participants[0].name} Cards` : 'Home Team Cards',
-                    players: teamPlayers.team1
-                });
-            }
-            
-            // Add team2 section if it has players
-            if (teamPlayers.team2.length > 0) {
-                sections.push({
-                    id: 'team2-cards',
-                    title: matchData?.participants?.[1]?.name ? `${matchData.participants[1].name} Cards` : 'Away Team Cards',
-                    players: teamPlayers.team2
-                });
-            }
-            
-            // Render team sections
-            return sections.map(section => (
-                <div key={section.id} className="bg-white border overflow-hidden transition-all duration-200">
-                    <div className="px-4 py-2.5">
-                        <h3 className="text-sm font-semibold text-gray-800">{section.title}</h3>
-                    </div>
-                    <div className="p-3">
-                        <div className="grid grid-cols-1 gap-3">
-                            {section.players.map(player => (
-                                <div key={player.name} className="border-b pb-2 last:border-0 last:pb-0">
-                                    <div className="font-medium text-sm mb-1">{player.name}</div>
-                                    <div className="grid grid-cols-2 gap-1">
-                                        {player.options.map((option, idx) => (
-                                            <BettingOptionButton
-                                                key={`${player.name}-${option.action}-${idx}`}
-                                                label={option.label}
-                                                value={option.value}
-                                                sectionType="player-cards"
-                                                optionId={option.id}
-                                                matchData={matchData}
-                                            />
-                                        ))}
+                // Organize players into teams if possible
+                if (matchData && matchData.participants && matchData.participants.length >= 2) {
+                    const team1Name = matchData.participants[0].name;
+                    const team2Name = matchData.participants[1].name;
+                    Object.values(playerOptions).forEach(player => {
+                        const playerNameLower = player.name.toLowerCase();
+                        const team1NameLower = team1Name.toLowerCase();
+                        const team2NameLower = team2Name.toLowerCase();
+                        if (player.team === 'home' || 
+                            player.team === team1Name || 
+                            playerNameLower.includes(team1NameLower)) {
+                            teamPlayers.team1.push(player);
+                        } else if (player.team === 'away' || 
+                                player.team === team2Name || 
+                                playerNameLower.includes(team2NameLower)) {
+                            teamPlayers.team2.push(player);
+                        } else {
+                            teamPlayers.team1.push(player);
+                        }
+                    });
+                } else {
+                    teamPlayers.team1 = Object.values(playerOptions);
+                }
+                teamPlayers.team1.sort((a, b) => a.name.localeCompare(b.name));
+                teamPlayers.team2.sort((a, b) => a.name.localeCompare(b.name));
+                const sections = [];
+                if (teamPlayers.team1.length > 0) {
+                    sections.push({
+                        id: 'team1-cards',
+                        title: matchData?.participants?.[0]?.name ? `${matchData.participants[0].name} Cards` : 'Home Team Cards',
+                        players: teamPlayers.team1
+                    });
+                }
+                if (teamPlayers.team2.length > 0) {
+                    sections.push({
+                        id: 'team2-cards',
+                        title: matchData?.participants?.[1]?.name ? `${matchData.participants[1].name} Cards` : 'Away Team Cards',
+                        players: teamPlayers.team2
+                    });
+                }
+                return sections.map(section => (
+                    <div key={section.id} className="bg-white border overflow-hidden transition-all duration-200">
+                        <div className="px-4 py-2.5">
+                            <h3 className="text-sm font-semibold text-gray-800">{section.title}</h3>
+                        </div>
+                        <div className="p-3">
+                            <div className="grid grid-cols-1 gap-3">
+                                {section.players.map(player => (
+                                    <div key={player.name} className="border-b pb-2 last:border-0 last:pb-0">
+                                        <div className="font-medium text-sm mb-1">{player.name}</div>
+                                        <div className="grid grid-cols-2 gap-1">
+                                            {player.options.map((option, idx) => (
+                                                <BettingOptionButton
+                                                    key={`${player.name}-${option.action}-${idx}`}
+                                                    label={option.label}
+                                                    value={option.value}
+                                                    sectionType="player-cards"
+                                                    optionId={option.id}
+                                                    matchData={matchData}
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-            ));
+                ));
+            } else {
+                // Fallback: render as standard markets
+                return category.markets.map((section) => (
+                    <div key={section.id} className="bg-white border overflow-hidden transition-all duration-200">
+                        <div className="px-4 py-2.5">
+                            <h3 className="text-sm font-semibold text-gray-800">{section.title}</h3>
+                        </div>
+                        <div className="p-3">
+                            {renderOptions(section.options, section)}
+                        </div>
+                    </div>
+                ));
+            }
         }
-        
         // For other categories, use the standard rendering
         return category.markets.map((section) => (
             <div key={section.id} className="bg-white border overflow-hidden transition-all duration-200">
@@ -550,154 +586,48 @@ const BettingOptionButton = ({
 
     // Format the label to highlight the handicap value or over/under value
     const formattedLabel = () => {
-        // For Team Total Goals market
-        if (marketDescription === 'Team Total Goals') {
-            return (
-                <div className="flex items-center gap-1">
-                    <span>{label}</span>
-                    <span className="bg-white/20 px-1 rounded text-[9px]">{total || value}</span>
-                </div>
-            );
-        }
-
-        // For Correct Score market
-        if (marketDescription === 'Correct Score') {
-            return (
-                <div className="flex items-center gap-1">
-                    <span>{label}</span>
-                    <span className="bg-white/20 px-1 rounded text-[9px]">{name}</span>
-                </div>
-            );
-        }
-
-        // For Clean Sheet market
-        if (marketDescription === 'Clean Sheet') {
-            return (
-                <div className="flex items-center gap-1">
-                    <span>{label}</span>
-                    <span className="bg-white/20 px-1 rounded text-[9px]">{name}</span>
-                </div>
-            );
-        }
-
-        // For Specials market
-        if (marketDescription === 'Specials') {
-            return (
-                <div className="flex items-center gap-1">
-                    <span>{label}</span>
-                    <span className="bg-white/20 px-1 rounded text-[9px]">{name}</span>
-                </div>
-            );
-        }
-
-        // For Last Match Corner market
-        if (marketDescription === 'Last Match Corner' && matchData?.participants?.length >= 2) {
-            if (label === '1') {
-                return matchData.participants[0].name;
-            } else if (label === '2') {
-                return matchData.participants[1].name;
-            }
-        }
-
-        // For Corner Match Bet markets
-        if (sectionType === 'corner-match-bet' && matchData?.participants?.length >= 2) {
-            if (label === '1') {
-                return matchData.participants[0].name;
-            } else if (label === '2') {
-                return matchData.participants[1].name;
-            } else if (label === 'Tie' || label === 'tie' || label === 'X') {
-                return 'Draw';
-            }
-        }
-
-        // For Team Corners market
-        if (marketDescription === 'Team Corners' && matchData?.participants?.length >= 2) {
-            if (label === '1') {
+        // If label is '1' or '2', always use the team name
+        if ((label === '1' || label === '2') && matchData?.participants?.length >= 2) {
+            const teamName = label === '1' ? matchData.participants[0].name : matchData.participants[1].name;
+            // Prefer handicap badge if present
+            if (typeof handicapValue !== 'undefined' && handicapValue !== null && handicapValue !== '') {
                 return (
                     <div className="flex items-center gap-1">
-                        <span>{matchData.participants[0].name}</span>
-                        <span className="bg-white/20 px-1 rounded text-[9px]">{total}</span>
-                    </div>
-                );
-            } else if (label === '2') {
-                return (
-                    <div className="flex items-center gap-1">
-                        <span>{matchData.participants[1].name}</span>
-                        <span className="bg-white/20 px-1 rounded text-[9px]">{total}</span>
+                        <span>{teamName}</span>
+                        <span className="bg-white/20 px-1 rounded text-[9px]">{handicapValue}</span>
                     </div>
                 );
             }
-        }
-
-        // For Corners Race market
-        if (marketDescription === 'Corners Race' && matchData?.participants?.length >= 2) {
-            console.log('Corners Race Data:', { label, name }); // Debug log
-            if (label === '1') {
+            // Otherwise, show name badge if present and different
+            if (name && name !== label) {
                 return (
                     <div className="flex items-center gap-1">
-                        <span>{matchData.participants[0].name}</span>
+                        <span>{teamName}</span>
                         <span className="bg-white/20 px-1 rounded text-[9px]">{name}</span>
                     </div>
                 );
-            } else if (label === '2') {
-                return (
-                    <div className="flex items-center gap-1">
-                        <span>{matchData.participants[1].name}</span>
-                        <span className="bg-white/20 px-1 rounded text-[9px]">{name}</span>
-                    </div>
-                );
-            } else if (label === 'Neither') {
-                return 'Neither';
             }
+            return teamName;
         }
-
-        // For over/under options including Alternative Goal Line
-        if (label.toLowerCase().startsWith('over') || label.toLowerCase().startsWith('under')) {
-            const [type, ...values] = label.split(' ');
-            const thresholds = values.join(' ').split(',').map(v => v.trim());
-            
+        // If option has a handicap value, show label + handicap
+        if (typeof handicapValue !== 'undefined' && handicapValue !== null && handicapValue !== '') {
             return (
                 <div className="flex items-center gap-1">
-                    <span>{type}</span>
-                    {thresholds.map((threshold, index) => (
-                        <span key={index} className="bg-white/20 px-1 rounded text-[9px]">{threshold}</span>
-                    ))}
+                    <span>{label}</span>
+                    <span className="bg-white/20 px-1 rounded text-[9px]">{handicapValue}</span>
                 </div>
             );
         }
-
-        // For To Score In Half markets
-        if (halfIndicator) {
+        // Always show label + name (unless they are the same)
+        if (label && name && label !== name) {
             return (
-                <>
-                    {label} <span className="bg-white/20 px-1 rounded text-[9px] ml-1">{halfIndicator}</span>
-                </>
+                <div className="flex items-center gap-1">
+                    <span>{label}</span>
+                    <span className="bg-white/20 px-1 rounded text-[9px]">{name}</span>
+                </div>
             );
         }
-
-        // For Half Time Correct Score
-        if (sectionType === 'half-time' && matchData?.participants) {
-            // Extract team name and score
-            const match = label.match(/^(.+?)\s+(\d+-\d+)$/);
-            if (match) {
-                const [_, team, score] = match;
-                return (
-                    <>
-                        {team} <span className="bg-white/20 px-1 rounded text-[9px] ml-1">{score}</span>
-                    </>
-                );
-            }
-        }
-
-        // For Asian Handicap and Alternative Asian Handicap markets
-        if ((isHandicapOption || sectionType === 'asian-handicap' || sectionType === 'alternative-asian-handicap') && handicapValue) {
-            return (
-                <>
-                    {label} <span className="bg-white/20 px-1 rounded text-[9px] ml-1">{handicapValue}</span>
-                </>
-            );
-        }
-        
+        // If label and name are the same, or name is missing, just show label
         return label;
     };
 
