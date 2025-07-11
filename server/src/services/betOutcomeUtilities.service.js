@@ -206,61 +206,7 @@ class BetOutcomeUtilities extends BetOutcomeCalculationService {
     };
   }
 
-  /**
-   * Calculate first/last goalscorer outcomes with minute-specific data
-   */
-  calculateGoalscorerOutcome(bet, matchData, goalsData = []) {
-    if (!goalsData || goalsData.length === 0) {
-      // Fallback to basic calculation if detailed goal data unavailable
-      return this.calculatePlayerGoals(bet, matchData);
-    }
 
-    const playerName = bet.betOption.toLowerCase();
-    const marketType = this.getGoalscorerMarketType(bet.marketId);
-
-    let isWinning = false;
-
-    switch (marketType) {
-      case "FIRST_GOALSCORER":
-        const firstGoal = goalsData.find(
-          (goal) => goal.minute === Math.min(...goalsData.map((g) => g.minute))
-        );
-        isWinning =
-          firstGoal && firstGoal.player.toLowerCase().includes(playerName);
-        break;
-
-      case "LAST_GOALSCORER":
-        const lastGoal = goalsData.find(
-          (goal) => goal.minute === Math.max(...goalsData.map((g) => g.minute))
-        );
-        isWinning =
-          lastGoal && lastGoal.player.toLowerCase().includes(playerName);
-        break;
-
-      case "ANYTIME_GOALSCORER":
-        isWinning = goalsData.some((goal) =>
-          goal.player.toLowerCase().includes(playerName)
-        );
-        break;
-
-      default:
-        return this.calculatePlayerGoals(bet, matchData);
-    }
-
-    const goalsByPlayer = goalsData.filter((goal) =>
-      goal.player.toLowerCase().includes(playerName)
-    );
-
-    return {
-      status: isWinning ? "won" : "lost",
-      payout: isWinning ? bet.stake * bet.odds : 0,
-      playerName: bet.betOption,
-      marketType: marketType,
-      goalsScored: goalsByPlayer.length,
-      goalTimes: goalsByPlayer.map((g) => g.minute),
-      reason: `${marketType}: ${isWinning ? "Won" : "Lost"}`,
-    };
-  }
 
   /**
    * Calculate minute-specific markets (e.g., goal in specific time period)

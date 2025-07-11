@@ -135,11 +135,7 @@ class BetOutcomeCalculationService {
         marketId
       );
       //INFO: here we will see in outcome 'won' or 'lost' and will update the bet according to that
-      return {
-        ...outcome,
-        betId: bet._id,
-        calculatedAt: new Date(),
-      };
+      return outcome;
     } catch (error) {
       console.error(
         `[BetOutcomeCalculation] Error calculating outcome for bet ${bet._id}:`,
@@ -515,28 +511,7 @@ class BetOutcomeCalculationService {
     };
 
     // Add goal details for debugging
-    if (goalDetails) {
-      if (Array.isArray(goalDetails)) {
-        // Anytime goalscorer - multiple goals possible
-        response.goalDetails = goalDetails.map(goal => ({
-          minute: goal.minute,
-          extraMinute: goal.extra_minute,
-          result: goal.result,
-          addition: goal.addition
-        }));
-        response.goalsScored = goalDetails.length;
-      } else {
-        // First/Last goalscorer - single goal
-        response.goalDetails = {
-          minute: goalDetails.minute,
-          extraMinute: goalDetails.extra_minute,
-          result: goalDetails.result,
-          addition: goalDetails.addition
-        };
-        response.goalsScored = 1;
-      }
-    }
-
+    
     return response;
   }
 
