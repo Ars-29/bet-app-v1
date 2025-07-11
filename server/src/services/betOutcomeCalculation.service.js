@@ -232,8 +232,15 @@ class BetOutcomeCalculationService {
       case "PLAYER_SHOTS_ON_TARGET":
         return this.calculatePlayerShotsOnTarget(bet, matchData);
       case "PLAYER_TOTAL_SHOTS":
-        return this.calculatePlayerTotalShots(bet, matchData);
-
+        return this.calculatePlayerTotalShots(bet,matchData);
+      case "EXACT_TOTAL_GOALS":
+        return this.calculateExactTotalGoals(bet,matchData);
+      case "SECOND_HALF_GOALS_ODD_EVEN":
+        return this.calculateSecondHalfGoalsOddEven(bet,matchData);
+      case "FIRST_HALF_GOALS_ODD_EVEN":
+        return this.calculateFirstHalfGoalsOddEven(bet,matchData);
+      case "BOTH_TEAM_TO_SCORE_1ST_HALF_2ND_HALF":
+        return this.calculateBothTeamsScore1stHalf2ndHalf(bet,matchData);
       default:
         return this.calculateGenericOutcome(bet, matchData);
     }
@@ -1235,6 +1242,32 @@ class BetOutcomeCalculationService {
     };
   }
 
+  calculateExactTotalGoals(bet,matchData){
+    // Extract the number from the label (e.g., "5 Goals" -> 5)
+    const exactTotalGoals = parseInt((bet.betDetails?.label || '').match(/\d+/)?.[0] || 0);
+    const matchScores = this.extractMatchScores(matchData);
+    const totalGoals = matchScores.homeScore + matchScores.awayScore;
+    const isWinning = totalGoals === exactTotalGoals;
+    return {
+      status: isWinning ? "won" : "lost",
+    };
+  }
+  calculateSecondHalfGoalsOddEven(bet,matchData){
+    const matchScores = this.extractSecondHalfScores(matchData);
+    const totalGoals = matchScores.homeScore + matchScores.awayScore;
+    const isWinning = totalGoals % 2 === 0;
+    return {
+      status: isWinning ? "won" : "lost",
+    };
+  }
+  calculateFirstHalfGoalsOddEven(bet,matchData){
+    const matchScores = this.extractFirstHalfScores(matchData);
+    const totalGoals = matchScores.homeScore + matchScores.awayScore;
+    const isWinning = totalGoals % 2 === 0;
+    return {
+      status: isWinning ? "won" : "lost",
+    };
+  }
   /**
    * Enhanced market type detection with more markets
    */
@@ -1270,6 +1303,10 @@ class BetOutcomeCalculationService {
       GOALSCORERS: [90], // Goalscorers (First/Last/Anytime)
       PLAYER_SHOTS_ON_TARGET: [267], // Player Total Shots On Target
       PLAYER_TOTAL_SHOTS: [268], // Player Total Shots
+      EXACT_TOTAL_GOALS: [93], // Exact Total Goals
+      SECOND_HALF_GOALS_ODD_EVEN: [124], // Second Half Goals Odd/Even
+      FIRST_HALF_GOALS_ODD_EVEN: [95], // First Half Goals Odd/Even
+      BOTH_TEAM_TO_SCORE_1ST_HALF_2ND_HALF: [125], // Both Teams to Score in 1st/2nd Half
       ...this.marketTypes,
     };
 
@@ -1415,6 +1452,82 @@ class BetOutcomeCalculationService {
     }
 
     return null;
+  }
+  extractFirstHalfScores(matchData) {
+    if (matchData.scores && Array.isArray(matchData.scores)) {
+      // Extract 1ST_HALF scores - this is the half-time result
+      const firstHalfScores = matchData.scores.filter(
+        (score) => score.description === "1ST_HALF"
+      );
+
+      if (firstHalfScores.length > 0) {
+        let homeScore = 0;
+        let awayScore = 0;
+
+        firstHalfScores.forEach((score) => {
+          if (score.score && score.score.goals !== undefined) {
+            if (score.score.participant === "home") {
+              homeScore = score.score.goals;
+            } else if (score.score.participant === "away") {
+              awayScore = score.score.goals;
+            }
+          }
+        });
+
+        return { homeScore, awayScore };
+      }
+
+      // Fallback: try to find legacy half time scores
+      const halfTimeScore = matchData.scores.find(
+        (score) =>
+          score.description === "HT" || score.description === "HALFTIME"
+      );
+
+      if (halfTimeScore && halfTimeScore.score?.goals?.home !== undefined) {
+        return {
+          homeScore: halfTimeScore.score.goals.home || 0,
+          awayScore: halfTimeScore.score.goals.away || 0,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  calculateBothTeamsScore1stHalf2ndHalf(bet,matchData){
+    const firstHalfScores = this.extractFirstHalfScores(matchData);
+    const secondHalfScores = this.extractSecondHalfScores(matchData);
+    const isWinning = firstHalfScores.homeScore > 0 && secondHalfScores.homeScore > 0 && firstHalfScores.awayScore > 0 && secondHalfScores.awayScore > 0;
+
+    return {
+      status: isWinning ? "won" : "lost",
+    };
+  }
+  /**
+   * Extract second half scores from match data
+   */
+  extractSecondHalfScores(matchData) {
+    if (matchData.scores && Array.isArray(matchData.scores)) {
+      let homeScore = 0;
+      let awayScore = 0;
+
+      // Only sum 2ND_HALF_ONLY goals
+      const secondHalfOnlyScores = matchData.scores.filter(
+        (score) => score.description === "2ND_HALF_ONLY"
+      );
+      secondHalfOnlyScores.forEach((score) => {
+        if (score.score && score.score.goals !== undefined) {
+          if (score.score.participant === "home") {
+            homeScore += score.score.goals;
+          } else if (score.score.participant === "away") {
+            awayScore += score.score.goals;
+          }
+        }
+      });
+
+      return { homeScore, awayScore };
+    }
+    return { homeScore: 0, awayScore: 0 };
   }
 
   /**
