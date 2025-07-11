@@ -11,16 +11,37 @@ class BetOutcomeUtilities extends BetOutcomeCalculationService {
     // Extended market mappings for more specific calculations
     this.extendedMarketTypes = {
       ...this.marketTypes,
-      FIRST_HALF_GOALS: [25], // First Half Goals
-      SECOND_HALF_GOALS: [27], // Second Half Goals
-      PENALTY: [85], // Penalty markets
-      CLEAN_SHEET: [86], // Clean sheet markets
-      WIN_TO_NIL: [87], // Win to nil
-      EXACT_GOALS: [88], // Exact number of goals
-      GOALSCORER_FIRST: [247], // First goalscorer
-      GOALSCORER_LAST: [248], // Last goalscorer
-      GOALSCORER_ANYTIME: [11], // Anytime goalscorer
-      MATCH_COMBO: [90], // Combination bets
+      MATCH_RESULT: [1], // Fulltime Result
+      DOUBLE_CHANCE: [2], // Double Chance
+      OVER_UNDER: [4, 5], // Match Goals, Alternative Match Goals
+      ASIAN_HANDICAP: [6], // Asian Handicap
+      GOAL_LINE: [7], // Goal Line
+      CORRECT_SCORE: [8], // Final Score
+      THREE_WAY_HANDICAP: [9], // 3-Way Handicap
+      DRAW_NO_BET: [10], // Draw No Bet
+      LAST_TEAM_TO_SCORE: [11], // Last Team To Score
+      ODD_EVEN_GOALS: [12], // Goals Odd/Even
+      RESULT_BOTH_TEAMS_SCORE: [13], // Result / Both Teams To Score
+      BOTH_TEAMS_SCORE: [14], // Both Teams To Score
+      BOTH_TEAMS_SCORE_1ST_HALF: [15], // Both Teams to Score in 1st Half
+      BOTH_TEAMS_SCORE_2ND_HALF: [16], // Both Teams to Score in 2nd Half
+      CLEAN_SHEET: [17], // Team Clean Sheet
+      HOME_TEAM_EXACT_GOALS: [18], // Home Team Exact Goals
+      AWAY_TEAM_EXACT_GOALS: [19], // Away Team Exact Goals
+      TEAM_TOTAL_GOALS: [20, 21], // Home Team Goals, Away Team Goals
+      HALF_TIME_RESULT: [22, 23], // To Win 1st Half, To Win 2nd Half
+      TEAM_TO_SCORE_HALF: [24, 25], // Team to Score in 1st/2nd Half
+      HALF_TIME_ASIAN_HANDICAP: [26], // 1st Half Asian Handicap
+      HALF_TIME_GOAL_LINE: [27], // 1st Half Goal Line
+      HALF_TIME_GOALS: [28], // 1st Half Goals
+      // Additional specialized markets
+      FIRST_HALF_GOALS: [28], // First Half Goals
+      SECOND_HALF_GOALS: [23], // Second Half Goals (using To Win 2nd Half as proxy)
+      PENALTY: [85], // Penalty markets (if they exist in higher IDs)
+      GOALSCORER_FIRST: [247], // First goalscorer (legacy mapping)
+      GOALSCORER_LAST: [248], // Last goalscorer (legacy mapping)
+      GOALSCORER_ANYTIME: [11], // Anytime goalscorer (Last Team To Score as proxy)
+      MATCH_COMBO: [13], // Combination bets (using Result/BTTS)
       SUBSTITUTION: [91], // Player substitution markets
       OFFSIDE: [92], // Offside markets
       THROW_IN: [93], // Throw-in markets
