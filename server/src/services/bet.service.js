@@ -50,12 +50,71 @@ class BetService {
     return market ? market.name : 'Unknown Market';
   }
 
+  // Helper method to get market ID by market name/title
+  getMarketIdByName(marketName) {
+    const marketsData = this.getMarketsData();
+    
+    // Search for market by name
+    for (const [id, market] of Object.entries(marketsData.markets)) {
+      if (market.name === marketName) {
+        return parseInt(id);
+      }
+    }
+    
+    // Fallback mapping for common market names
+    const marketNameMapping = {
+      'Fulltime Result': 1,
+      'Double Chance': 2,
+      'Match Goals': 4,
+      'Asian Handicap': 6,
+      'Both Teams To Score': 8,
+      'Exact Goals Number': 9,
+      'Highest Scoring Half': 10,
+      'Goals Over/Under': 11,
+      'First Goal Scorer': 12,
+      'Last Goal Scorer': 13,
+      'Anytime Goal Scorer': 14,
+      'Player To Score 2 Or More': 15,
+      'Correct Score': 16,
+      'Half Time Result': 17,
+      'Half Time/Full Time': 18,
+      'To Qualify': 19,
+      'Both Teams To Score - First Half': 20,
+      'Both Teams To Score - Second Half': 21,
+      'First Half Goals Over/Under': 22,
+      'Second Half Goals Over/Under': 23,
+      'Odd/Even Goals': 24,
+      'First Half Odd/Even Goals': 25,
+      'Second Half Odd/Even Goals': 26,
+      'First Team To Score': 27,
+      'Last Team To Score': 28,
+      'Winning Margin': 29,
+      'To Score In Both Halves': 30
+    };
+
+    return marketNameMapping[marketName] || null;
+  }
+
   // Helper method to create betDetails object
   createBetDetails(odds, marketId) {
-    const marketName = this.getMarketName(marketId);
+    // Ensure marketId is not undefined or null
+    let safeMarketId = marketId || odds.market_id;
+    
+    // If still no market ID, try to resolve it from market description
+    if (!safeMarketId || safeMarketId === 'unknown_market') {
+      if (odds.market_description) {
+        safeMarketId = this.getMarketIdByName(odds.market_description) || 'unknown_market';
+      } else {
+        safeMarketId = 'unknown_market';
+      }
+    }
+    
+    const marketName = this.getMarketName(safeMarketId);
+    
+    console.log(`[createBetDetails] Final market ID: ${safeMarketId}, market name: ${marketName}`);
     
     return {
-      market_id: marketId,
+      market_id: safeMarketId,
       market_name: marketName,
       label: odds.label || odds.name || '',
       value: parseFloat(odds.value) || 0,
@@ -205,6 +264,13 @@ class BetService {
       // Search for the exact odd ID in all sections
       for (const section of liveOdds) {
         console.log(`[placeBet] Checking section: ${section.title} with ${section.options?.length || 0} options`);
+        console.log(`[placeBet] Section structure:`, {
+          title: section.title,
+          id: section.id,
+          marketId: section.marketId,
+          market_id: section.market_id,
+          allKeys: Object.keys(section)
+        });
         
         // Log all available odd IDs in this section for debugging
         if (section.options && section.options.length > 0) {
@@ -252,14 +318,32 @@ class BetService {
         );
       }
 
+      // Debug the foundMarket structure to understand available properties
+      console.log(`[placeBet] foundMarket structure:`, {
+        id: foundMarket.id,
+        marketId: foundMarket.marketId,
+        market_id: foundMarket.market_id,
+        title: foundMarket.title,
+        allKeys: Object.keys(foundMarket)
+      });
+
+      // Get market ID by title since live odds don't include market ID
+      const resolvedMarketId = foundMarket.marketId || 
+                              foundMarket.market_id || 
+                              foundMarket.id || 
+                              this.getMarketIdByName(foundMarket.title) || 
+                              'unknown_market';
+
+      console.log(`[placeBet] Resolved market ID: ${resolvedMarketId} for title: "${foundMarket.title}"`);
+
       odds = {
         id: foundOdd.id,
         value: foundOdd.value,
         name: foundOdd.name || foundOdd.label,
-        market_id: foundMarket.marketId || foundMarket.id || foundMarket.market_id,
+        market_id: resolvedMarketId,
         label: foundOdd.label,
         total: foundOdd.total,
-        market_description: foundMarket.description,
+        market_description: foundMarket.description || foundMarket.title,
         handicap: foundOdd.handicap
       };
     }
