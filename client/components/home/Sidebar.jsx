@@ -96,11 +96,7 @@ const Sidebar = () => {
             href: '/admin/finance',
             icon: DollarSign
         },
-        {
-            title: 'Settings',
-            href: '/admin/settings',
-            icon: Settings
-        },
+      
         {
             title: 'Leagues',
             href: '/admin/leagues',
