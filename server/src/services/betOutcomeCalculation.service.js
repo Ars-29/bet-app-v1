@@ -287,9 +287,25 @@ class BetOutcomeCalculationService {
     const scores = this.extractMatchScores(matchData);
     const totalGoals = scores.homeScore + scores.awayScore;
 
-    // Extract threshold from bet option (e.g., "Over 2.5" -> 2.5)
-    const threshold = this.extractThreshold(bet.betDetails.label || bet.betOption);
-    const betType = this.extractOverUnderType(bet.betDetails.label || bet.betOption);
+    // Enhanced threshold extraction - prefer betDetails.total, then extract from other fields
+    let threshold;
+    let betType;
+    
+    if (bet.betDetails) {
+      // For market 80 and similar, use betDetails.total for threshold and betDetails.label for type
+      if (bet.betDetails.total !== null && bet.betDetails.total !== undefined) {
+        threshold = parseFloat(bet.betDetails.total);
+      } else {
+        threshold = this.extractThreshold(bet.betDetails.name || bet.betDetails.label || bet.betOption);
+      }
+      
+      // Extract bet type from label (Over/Under)
+      betType = this.extractOverUnderType(bet.betDetails.label || bet.betDetails.name || bet.betOption);
+    } else {
+      // Fallback to original logic
+      threshold = this.extractThreshold(bet.betOption);
+      betType = this.extractOverUnderType(bet.betOption);
+    }
 
     let isWinning;
     if (betType === "OVER") {
@@ -307,7 +323,12 @@ class BetOutcomeCalculationService {
       actualGoals: totalGoals,
       threshold: threshold,
       betType: betType,
-      reason: `Total goals: ${totalGoals}, Threshold: ${threshold}`,
+      marketId: bet.betDetails?.market_id,
+      debug: {
+        betDetails: bet.betDetails,
+        betOption: bet.betOption
+      },
+      reason: `Total goals: ${totalGoals}, Threshold: ${threshold} (${betType})`,
     };
   }
 
@@ -1316,7 +1337,7 @@ class BetOutcomeCalculationService {
     const extendedMarketTypes = {
       MATCH_RESULT: [1], // Fulltime Result
       DOUBLE_CHANCE: [2], // Double Chance
-      OVER_UNDER: [4, 5,81], // Match Goals, Alternative Match Goals
+      OVER_UNDER: [4, 5, 80, 81], // Match Goals, Alternative Match Goals, Goals Over/Under
       ASIAN_HANDICAP: [6], // Asian Handicap
       GOAL_LINE: [7], // Goal Line
       CORRECT_SCORE: [8], // Final Score
