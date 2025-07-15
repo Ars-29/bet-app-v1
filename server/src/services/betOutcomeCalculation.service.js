@@ -748,21 +748,76 @@ class BetOutcomeCalculationService {
    */
   calculateTeamTotalGoals(bet, matchData) {
     const scores = this.extractMatchScores(matchData);
-    const betOption = bet.betOption.toLowerCase();
-
+    
+    // Enhanced team identification - check betDetails first for market 86, then fallback to existing logic
     let teamGoals;
-    if (betOption.includes("home")) {
-      teamGoals = scores.homeScore;
-    } else if (betOption.includes("away")) {
-      teamGoals = scores.awayScore;
+    let teamIdentifier = '';
+    
+    // For market 86 - use betDetails.label for team identification
+    if (bet.betDetails && bet.betDetails.market_id === "86" && bet.betDetails.label) {
+      teamIdentifier = bet.betDetails.label;
+      
+      // "1" means home team, "2" means away team
+      if (teamIdentifier === "1") {
+        teamGoals = scores.homeScore;
+      } else if (teamIdentifier === "2") {
+        teamGoals = scores.awayScore;
+      } else {
+        return {
+          status: "canceled",
+          payout: bet.stake,
+          reason: "Unable to determine team from label",
+          teamIdentifier: teamIdentifier
+        };
+      }
     } else {
+      // Existing logic for other markets
+      const betOption = bet.betOption.toLowerCase();
+      teamIdentifier = betOption;
+      
+      if (betOption.includes("home")) {
+        teamGoals = scores.homeScore;
+      } else if (betOption.includes("away")) {
+        teamGoals = scores.awayScore;
+      } else {
+        return {
+          status: "canceled",
+          payout: bet.stake,
+          reason: "Unable to determine team",
+        };
+      }
+    }
+
+    // For exact goals markets (market IDs 18, 19), check exact match
+    if (bet.betDetails?.market_id === "18" || bet.betDetails?.market_id === "19") {
+      const targetGoals = parseInt(bet.betOption) || 0;
+      const isWinning = teamGoals === targetGoals;
+      
       return {
-        status: "canceled",
-        payout: bet.stake,
-        reason: "Unable to determine team",
+        status: isWinning ? "won" : "lost",
+        payout: isWinning ? bet.stake * bet.odds : 0,
+        teamGoals: teamGoals,
+        targetGoals: targetGoals,
+        reason: `Team goals: ${teamGoals}, Target: ${targetGoals}`,
       };
     }
 
+    // For market 86 - simple team selection (bet on team scoring at least 1 goal)
+    if (bet.betDetails?.market_id === "86") {
+      // For now, assume it's betting on team scoring at least 1 goal
+      // This can be enhanced later if there are over/under variants
+      const isWinning = teamGoals > 0;
+      
+      return {
+        status: isWinning ? "won" : "lost",
+        payout: isWinning ? bet.stake * bet.odds : 0,
+        teamGoals: teamGoals,
+        teamIdentifier: teamIdentifier,
+        reason: `Team ${teamIdentifier} goals: ${teamGoals}`,
+      };
+    }
+
+    // Existing over/under logic for other markets
     const threshold = this.extractThreshold(bet.betOption);
     const betType = this.extractOverUnderType(bet.betOption);
 
@@ -1276,7 +1331,7 @@ class BetOutcomeCalculationService {
       CLEAN_SHEET: [17], // Team Clean Sheet
       HOME_TEAM_EXACT_GOALS: [18], // Home Team Exact Goals
       AWAY_TEAM_EXACT_GOALS: [19], // Away Team Exact Goals
-      TEAM_TOTAL_GOALS: [20, 21], // Home Team Goals, Away Team Goals
+      TEAM_TOTAL_GOALS: [20, 21, 86], // Home Team Goals, Away Team Goals, Team Total Goals
       HALF_TIME_RESULT: [22, 23], // To Win 1st Half, To Win 2nd Half
       TEAM_TO_SCORE_HALF: [24, 25], // Team to Score in 1st/2nd Half
       HALF_TIME_ASIAN_HANDICAP: [26], // 1st Half Asian Handicap
