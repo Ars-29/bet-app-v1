@@ -241,6 +241,8 @@ class BetOutcomeCalculationService {
         return this.calculateBothTeamsScore1stHalf2ndHalf(bet,matchData);
       case "RESULT_TOTAL_GOALS":
         return this.calculateResultTotalGoals(bet, matchData);
+      case "SECOND_HALF_RESULT":
+        return this.calculateSecondHalfResult(bet, matchData);
       default:
         return this.calculateGenericOutcome(bet, matchData);
     }
@@ -1290,6 +1292,7 @@ class BetOutcomeCalculationService {
       RESULT_TOTAL_GOALS: [37], // Result/Total Goals
       LAST_TEAM_TO_SCORE:[11],
       RESULT_BOTH_TEAMS_SCORE: [13],
+      SECOND_HALF_RESULT: [97], // Second Half Result
     };
 
     for (const [type, ids] of Object.entries(extendedMarketTypes)) {
@@ -2018,6 +2021,52 @@ class BetOutcomeCalculationService {
   normalizeScoreFormat(betOption) {
     // Convert various score formats to "X-Y" format
     return betOption.replace(/[^\d-]/g, "").replace(/:/g, "-");
+  }
+
+  /**
+   * Calculate outcome for Second Half Result (market_id: 97)
+   * This market determines the winner based only on goals scored in the second half
+   * betDetails.label and betDetails.name contain: "Home", "Draw", "Away"
+   */
+  calculateSecondHalfResult(bet, matchData) {
+    // Extract second half scores only
+    const secondHalfScores = this.extractSecondHalfScores(matchData);
+    
+    if (!secondHalfScores) {
+      return {
+        status: "canceled",
+        payout: bet.stake,
+        reason: "Second half scores not available",
+      };
+    }
+
+    const { homeScore, awayScore } = secondHalfScores;
+
+    // Determine actual second half result
+    let actualResult;
+    if (homeScore > awayScore) {
+      actualResult = "Home";
+    } else if (homeScore < awayScore) {
+      actualResult = "Away";
+    } else {
+      actualResult = "Draw";
+    }
+
+    // Get bet selection from betDetails (prefer betDetails.label, fallback to betDetails.name)
+    const betSelection = bet.betDetails?.label || bet.betDetails?.name || bet.betOption || bet.selection || "";
+
+    // Check if the bet selection matches the actual second half result
+    const isWinning = actualResult === betSelection;
+
+    return {
+      status: isWinning ? "won" : "lost",
+      payout: isWinning ? bet.stake * bet.odds : 0,
+      actualResult: actualResult,
+      betSelection: betSelection,
+      secondHalfHomeScore: homeScore,
+      secondHalfAwayScore: awayScore,
+      reason: `Second Half Result: ${actualResult}, Bet: ${betSelection}`,
+    };
   }
 }
 
