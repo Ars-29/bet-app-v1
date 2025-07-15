@@ -180,9 +180,9 @@ class FixtureOptimizationService {
           ? fixture.odds
               .filter((odd) => {
                 // First check if market_id is allowed
-                if (!allowedMarketIds.includes(odd.market_id)) {
-                  return false;
-                }
+                // if (!allowedMarketIds.includes(odd.market_id)) {
+                //   return false;
+                // }
 
                 // For player-related markets (267, 268), validate player is in lineups
                 if (odd.market_id === 267 || odd.market_id === 268) {

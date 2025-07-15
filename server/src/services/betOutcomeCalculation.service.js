@@ -51,20 +51,20 @@ class BetOutcomeCalculationService {
     this.outcomeCache = new NodeCache({ stdTTL: 3600 }); // 1 hour cache
 
     // Market type mappings
-    this.marketTypes = {
-      MATCH_RESULT: [1, 52], // 1X2, Full Time Result
-      OVER_UNDER: [2, 26], // Over/Under Goals
-      BOTH_TEAMS_SCORE: [3], // BTTS
-      CORRECT_SCORE: [57], // Correct Score
-      ASIAN_HANDICAP: [6, 26], // Asian Handicap
-      PLAYER_GOALS: [247, 11], // Player Goalscorer
-      PLAYER_CARDS: [66], // Player Cards
-      DOUBLE_CHANCE: [13], // Double Chance
-      HALF_TIME_RESULT: [14], // Half Time Result
-      CORNERS: [44], // Corners
-      CARDS_TOTAL: [45], // Total Cards
-      GOALSCORERS: [90], // Goalscorers (First/Last/Anytime)
-    };
+    // this.marketTypes = {
+    //   MATCH_RESULT: [1, 52], // 1X2, Full Time Result
+    //   OVER_UNDER: [2, 26], // Over/Under Goals
+    //   BOTH_TEAMS_SCORE: [3], // BTTS
+    //   CORRECT_SCORE: [57], // Correct Score
+    //   ASIAN_HANDICAP: [6, 26], // Asian Handicap
+    //   PLAYER_GOALS: [247, 11], // Player Goalscorer
+    //   PLAYER_CARDS: [66], // Player Cards
+    //   DOUBLE_CHANCE: [13], // Double Chance
+    //   HALF_TIME_RESULT: [14], // Half Time Result
+    //   CORNERS: [44], // Corners
+    //   CARDS_TOTAL: [45], // Total Cards
+    //   GOALSCORERS: [90], // Goalscorers (First/Last/Anytime)
+    // };
 
     // Result mapping for common outcomes
     this.resultMappings = {
@@ -237,6 +237,8 @@ class BetOutcomeCalculationService {
         return this.calculateFirstHalfGoalsOddEven(bet,matchData);
       case "BOTH_TEAM_TO_SCORE_1ST_HALF_2ND_HALF":
         return this.calculateBothTeamsScore1stHalf2ndHalf(bet,matchData);
+      case "RESULT_TOTAL_GOALS":
+        return this.calculateResultTotalGoals(bet, matchData);
       default:
         return this.calculateGenericOutcome(bet, matchData);
     }
@@ -280,8 +282,8 @@ class BetOutcomeCalculationService {
     const totalGoals = scores.homeScore + scores.awayScore;
 
     // Extract threshold from bet option (e.g., "Over 2.5" -> 2.5)
-    const threshold = this.extractThreshold(bet.betOption);
-    const betType = this.extractOverUnderType(bet.betOption);
+    const threshold = this.extractThreshold(bet.betDetails.label || bet.betOption);
+    const betType = this.extractOverUnderType(bet.betDetails.label || bet.betOption);
 
     let isWinning;
     if (betType === "OVER") {
@@ -1253,7 +1255,7 @@ class BetOutcomeCalculationService {
     const extendedMarketTypes = {
       MATCH_RESULT: [1], // Fulltime Result
       DOUBLE_CHANCE: [2], // Double Chance
-      OVER_UNDER: [4, 5], // Match Goals, Alternative Match Goals
+      OVER_UNDER: [4, 5,81], // Match Goals, Alternative Match Goals
       ASIAN_HANDICAP: [6], // Asian Handicap
       GOAL_LINE: [7], // Goal Line
       CORRECT_SCORE: [8], // Final Score
@@ -1281,7 +1283,9 @@ class BetOutcomeCalculationService {
       EXACT_TOTAL_GOALS: [93], // Exact Total Goals
       SECOND_HALF_GOALS_ODD_EVEN: [124], // Second Half Goals Odd/Even
       FIRST_HALF_GOALS_ODD_EVEN: [95], // First Half Goals Odd/Even
-      BOTH_TEAM_TO_SCORE_1ST_HALF_2ND_HALF: [125], // Both Teams to Score in 1st/2nd Half
+      BOTH_TEAM_TO_SCORE_1ST_HALF_2ND_HALF: [125],
+      ALTERNATIVE_MATCH_GOALS:[5] ,// Both Teams to Score in 1st/2nd Half
+      RESULT_TOTAL_GOALS: [37], // Result/Total Goals
       ...this.marketTypes,
     };
 
@@ -1745,6 +1749,48 @@ class BetOutcomeCalculationService {
       status: "canceled",
       payout: bet.stake,
       reason: "Unable to calculate outcome for this market type",
+    };
+  }
+
+  /**
+   * Calculate outcome for Result/Total Goals (market_id: 37)
+   * This market combines match result (home/draw/away) and total goals (over/under)
+   * betDetails.name: "1" | "2" | "Draw" (result)
+   * betDetails.label: "Over" | "Under" (goals)
+   * betDetails.total: number (threshold, e.g. 2.5)
+   */
+  calculateResultTotalGoals(bet, matchData) {
+    // Extract scores
+    const scores = this.extractMatchScores(matchData);
+    const { homeScore, awayScore } = scores;
+    const totalGoals = homeScore + awayScore;
+
+    // Determine actual result
+    let actualResult;
+    if (homeScore > awayScore) actualResult = "1";
+    else if (homeScore < awayScore) actualResult = "2";
+    else actualResult = "Draw";
+
+    // Determine actual over/under
+    const threshold = bet.betDetails?.total ;
+    const actualOU = totalGoals > threshold ? "Over" : "Under";
+
+    // Compare with bet
+    const betResult = bet.betDetails?.name;
+    const betOU = bet.betDetails?.label;
+
+    const isWinning = (betResult === actualResult) && (betOU === actualOU);
+
+    return {
+      status: isWinning ? "won" : "lost",
+      payout: isWinning ? bet.stake * bet.odds : 0,
+      actualResult,
+      actualOU,
+      threshold,
+      totalGoals,
+      betResult,
+      betOU,
+      reason: `Result: ${actualResult}, Goals: ${totalGoals} (${actualOU}), Bet: ${betResult} & ${betOU}`,
     };
   }
 
