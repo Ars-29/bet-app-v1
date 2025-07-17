@@ -549,6 +549,9 @@ class BetService {
   }
 
   async fetchMatchResult(matchId, isLive = false) {
+    const maxRetries = 3;
+    let lastError;
+
     try {
       // Check cache first
       if (this.finalMatchResultCache.has(matchId)) {
@@ -557,55 +560,91 @@ class BetService {
         return cachedData;
       }
 
-      // For both live and non-live matches, get state, scores, participants and odds in one call
-      const response = await SportsMonksService.client.get(
-        `/football/fixtures/${matchId}`,
-        {
-          params: {
-            include: 
-              "state;inplayOdds;scores;participants;lineups.details;events;statistics;odds;state"  
-          },
+      // Retry logic for API calls
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[fetchMatchResult] Attempt ${attempt}/${maxRetries} for matchId: ${matchId}`);
+          
+          // Use minimal includes to reduce response size and avoid timeouts
+          const includes=
+             "state;inplayOdds;scores;participants;lineups.details;events;statistics;odds" // Minimal on first attempt
+            
+          const response = await SportsMonksService.client.get(
+            `/football/fixtures/${matchId}`,
+            {
+              params: {
+                include: includes
+              },
+              timeout: attempt === 1 ? 10000 : attempt === 2 ? 20000 : 30000, // Increase timeout with each attempt
+              headers: {
+                'Accept-Encoding': 'gzip, deflate', // Avoid br compression which might cause issues
+                'Connection': 'keep-alive'
+              }
+            }
+          );
+
+          if (!response.data?.data) {
+            throw new CustomError("Match not found", 404, "MATCH_NOT_FOUND");
+          }
+
+          console.log(`[fetchMatchResult] Successfully fetched data on attempt ${attempt} for matchId: ${matchId}`);
+
+          const data = response.data.data;
+
+          // The response contains match data at the root level
+          const matchData = {
+            name: data.name,
+            id: matchId,
+            state: data.state,
+            scores: data.scores || [],
+            participants: data.participants,
+            starting_at: data.starting_at,
+            odds: data.odds,
+            inplayodds: data.inplayodds || [],
+            lineups: data.lineups || [],
+            events: data.events || [],
+            statistics: data.statistics || [],
+          };
+
+          // Cache the match data if the match is finished (state.id === 5)
+          if (matchData.state?.id === 5) {
+            this.finalMatchResultCache.set(matchId, matchData);
+            console.log(`[fetchMatchResult] Cached final result for matchId: ${matchId}`);
+          }
+
+          return matchData;
+
+        } catch (error) {
+          lastError = error;
+          console.error(`[fetchMatchResult] Attempt ${attempt} failed for matchId: ${matchId}:`, error.message);
+          
+          // If it's a connection reset error and we have more attempts, wait before retrying
+          if ((error.code === 'ECONNRESET' || error.code === 'ECONNABORTED' || error.message.includes('aborted')) && attempt < maxRetries) {
+            const waitTime = attempt * 2000; // 2s, 4s wait times
+            console.log(`[fetchMatchResult] Waiting ${waitTime}ms before retry ${attempt + 1}`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
+          
+          // If it's not a retry-able error or last attempt, throw
+          if (attempt === maxRetries) {
+            throw error;
+          }
         }
-      );
-
-      if (!response.data?.data) {
-        throw new CustomError("Match not found", 404, "MATCH_NOT_FOUND");
       }
 
-
-      // Add debug logging
-      console.log(
-        `[fetchMatchResult] Raw response data:`,
-        JSON.stringify(response.data.data, null, 2)
-      );
-
-      const data = response.data.data;
-
-      // The response contains match data at the root level
-      const matchData = {
-        name: data.name,
-        id: matchId,
-        state: data.state,
-        scores: data.scores || [],
-        participants: data.participants,
-        starting_at: data.starting_at,
-        odds:  data.odds,
-        inplayodds : data.inplayodds || [],
-        participants: data.participants,
-        lineups: data.lineups || [],
-        events: data.events,
-        statistics: data.statistics || [],
-      };
-
-      // Cache the match data if the match is finished (state.id === 5)
-      if (matchData.state?.id === 5) {
-        this.finalMatchResultCache.set(matchId, matchData);
-        console.log(`[fetchMatchResult] Cached final result for matchId: ${matchId}`);
-      }
-
-      return matchData;
     } catch (error) {
-      console.error(`[fetchMatchResult] Error:`, error.message);
+      console.error(`[fetchMatchResult] All attempts failed for matchId: ${matchId}. Final error:`, error.message);
+      
+      // If it's a network error, try to provide a more user-friendly error
+      if (error.code === 'ECONNRESET' || error.code === 'ECONNABORTED' || error.message.includes('aborted')) {
+        throw new CustomError(
+          `Unable to fetch match data due to network connectivity issues. Please try again later.`,
+          503,
+          "NETWORK_ERROR"
+        );
+      }
+      
       throw error;
     }
   }
@@ -653,6 +692,25 @@ class BetService {
           }
         } catch (err) {
           console.error(`[checkBetOutcome] Error fetching match:`, err);
+          
+          // Handle network errors gracefully
+          if (err.code === 'ECONNRESET' || err.code === 'ECONNABORTED' || 
+              err.message.includes('aborted') || err.message.includes('NETWORK_ERROR')) {
+            
+            console.log(`[checkBetOutcome] Network error for betId: ${betId}. Rescheduling for retry in 10 minutes.`);
+            
+            // Reschedule for retry in 10 minutes due to network issues
+            const runAt = new Date(Date.now() + 10 * 60 * 1000);
+            agenda.schedule(runAt, "checkBetOutcome", { betId, matchId: bet.matchId });
+            
+            return {
+              betId: bet._id,
+              status: bet.status,
+              message: "Network error, rescheduled for retry"
+            };
+          }
+          
+          // For other errors, throw as before
           throw err;
         }
       }
@@ -694,6 +752,14 @@ class BetService {
    // Calculate bet outcome using the BetOutcomeCalculationService
    try {
      console.log(`[checkBetOutcome] Calculating outcome for betId: ${betId}`);
+     console.log(`[checkBetOutcome] Bet details:`, {
+       oddId: bet.oddId,
+       betOption: bet.betOption,
+       inplay: bet.inplay,
+       marketId: bet.marketId,
+       betDetails: bet.betDetails
+     });
+     
      const outcomeResult = await this.outcomeCalculator.calculateBetOutcome(bet, final_match);
      
      console.log(`[checkBetOutcome] Outcome calculated:`, outcomeResult);

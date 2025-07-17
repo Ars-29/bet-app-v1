@@ -732,113 +732,106 @@ class FixtureOptimizationService {
       return [];
     }
 
-    const footballDaily = [];
+    
 
-    if (includeAllLeagues) {
-      // Group fixtures by all leagues present in the data
-      const leagueMap = new Map();
+    // Filter for next 3 days only (today, tomorrow, day after tomorrow)
+    const now = new Date();
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    
+    const next3DaysFixtures = fixtures.filter(fixture => {
+      const matchTime = new Date(fixture.starting_at);
+      return matchTime > now && matchTime <= threeDaysFromNow; // Only matches in next 3 days
+    });
 
-      // First, collect all unique leagues from fixtures
-      fixtures.forEach((fixture) => {
-        const leagueId = fixture.league_id || fixture.league?.id;
+    console.log(`📅 Found ${next3DaysFixtures.length} matches in next 3 days`);
 
-        if (leagueId && !leagueMap.has(leagueId)) {
-          // Try to find league info from topLeagues first, then from fixture.league
-          const topLeagueInfo = topLeagues.find((tl) => tl.id === leagueId);
-          const leagueName =
-            topLeagueInfo?.name || fixture.league?.name || `League ${leagueId}`;
-          const leagueLogo =
-            topLeagueInfo?.image_path || fixture.league?.image_path || null;
-          const leagueCountry =
-            typeof topLeagueInfo?.country === "string"
-              ? topLeagueInfo?.country
-              : topLeagueInfo?.country?.name ||
-                fixture.league?.country?.name ||
-                null;
-
-          leagueMap.set(leagueId, {
-            id: leagueId,
-            name: leagueName,
-            imageUrl: leagueLogo,
-            country: leagueCountry,
-            matches: [],
-          });
-        }
-      });
-
-      // Group fixtures by league
-      fixtures.forEach((fixture) => {
-        const leagueId = fixture.league_id || fixture.league?.id;
-        if (leagueId && leagueMap.has(leagueId)) {
-          leagueMap.get(leagueId).matches.push(fixture);
-        }
-      });
-
-      // Convert map to array and process each league
-      leagueMap.forEach((leagueData) => {
-        if (leagueData.matches.length > 0) {
-          // Sort matches by date/time and limit per league
-          const sortedMatches = leagueData.matches
-            .sort((a, b) => new Date(a.starting_at) - new Date(b.starting_at))
-            .slice(0, 12); // Increased to 12 matches per league for 20-day range
-
-          footballDaily.push({
-            league: {
-              id: leagueData.id,
-              name: leagueData.name,
-              imageUrl: leagueData.imageUrl,
-              country: leagueData.country,
-            },
-            matches: sortedMatches,
-            match_count: sortedMatches.length,
-          });
-        }
-      });
-
-      // Sort leagues by number of matches, then by priority (top leagues first)
-      return footballDaily
-        .sort((a, b) => {
-          // First priority: if it's a top league
-          const aIsTop = topLeagues.some((tl) => tl.id === a.league.id);
-          const bIsTop = topLeagues.some((tl) => tl.id === b.league.id);
-
-          if (aIsTop && !bIsTop) return -1;
-          if (!aIsTop && bIsTop) return 1;
-
-          // Second priority: number of matches
-          return b.match_count - a.match_count;
-        })
-        .slice(0, 20); // Limit to top 20 leagues
-    } else {
-      // Original logic for top leagues only
-      topLeagues.forEach((league) => {
-        const leagueFixtures = fixtures.filter((fixture) => {
-          const matchesById = fixture.league_id === league.id;
-          const matchesByObject =
-            fixture.league && fixture.league.id === league.id;
-          return matchesById || matchesByObject;
-        });
-
-        if (leagueFixtures.length > 0) {
-          const sortedMatches = leagueFixtures
-            .sort((a, b) => new Date(a.starting_at) - new Date(b.starting_at))
-            .slice(0, 8);
-
-          footballDaily.push({
-            league: {
-              id: league.id,
-              name: league.name,
-              imageUrl: league.image_path || null,
-              country: league.country?.name || null,
-            },
-            matches: sortedMatches,
-            match_count: sortedMatches.length,
-          });
-        }
-      });
-
-      return footballDaily.sort((a, b) => b.match_count - a.match_count);
+    if (next3DaysFixtures.length === 0) {
+      console.log("⚠️ No matches found in next 3 days");
+      return [];
     }
+
+    // Sort all matches by start time (earliest first)
+    const sortedFixtures = next3DaysFixtures.sort((a, b) => {
+      return new Date(a.starting_at) - new Date(b.starting_at);
+    });
+
+    
+
+
+    // Group by league for display purposes, but don't filter leagues
+    const leagueMap = new Map();
+
+    sortedFixtures.forEach((fixture) => {
+      const leagueId = fixture.league_id || fixture.league?.id;
+      
+      if (!leagueId) {
+        console.log(`⚠️ Fixture ${fixture.id} has no league_id`);
+        return;
+      }
+
+      // Check if fixture has valid odds before including it
+      const hasValidOdds = fixture.odds && Array.isArray(fixture.odds) && fixture.odds.length > 0;
+      if (!hasValidOdds) {
+      
+        return;
+      }
+
+      if (!leagueMap.has(leagueId)) {
+        // Try to find league info from topLeagues first, then from fixture.league
+        const topLeagueInfo = topLeagues.find((tl) => tl.id === leagueId);
+        const leagueName =
+          topLeagueInfo?.name || fixture.league?.name || `League ${leagueId}`;
+        const leagueLogo =
+          topLeagueInfo?.image_path || fixture.league?.image_path || null;
+        const leagueCountry =
+          typeof topLeagueInfo?.country === "string"
+            ? topLeagueInfo?.country
+            : topLeagueInfo?.country?.name ||
+              fixture.league?.country?.name ||
+              null;
+
+        leagueMap.set(leagueId, {
+          id: leagueId,
+          name: leagueName,
+          imageUrl: leagueLogo,
+          country: leagueCountry,
+          matches: [],
+        });
+      }
+
+      leagueMap.get(leagueId).matches.push(fixture);
+    });
+
+    // Convert to array and sort leagues by their earliest match time
+    const footballDaily = Array.from(leagueMap.values())
+      .filter(league => league.matches.length > 0)
+      .map(league => {
+        // Sort matches within each league by start time to ensure earliest is first
+        const sortedMatches = league.matches.sort((a, b) => {
+          return new Date(a.starting_at) - new Date(b.starting_at);
+        });
+        
+        return {
+          league: {
+            id: league.id,
+            name: league.name,
+            imageUrl: league.imageUrl,
+            country: league.country,
+          },
+          matches: sortedMatches, // All matches for this league in next 3 days, sorted by time
+          match_count: sortedMatches.length,
+        };
+      })
+      .sort((a, b) => {
+        // Sort leagues by their earliest match time
+        const aEarliest = new Date(a.matches[0].starting_at);
+        const bEarliest = new Date(b.matches[0].starting_at);
+        return aEarliest - bEarliest;
+      });
+
+    
+
+    return footballDaily;
   }
 
   // Transform match odds to return only home/draw/away odds

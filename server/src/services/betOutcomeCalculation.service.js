@@ -68,13 +68,13 @@ class BetOutcomeCalculationService {
 
     // Result mapping for common outcomes
     this.resultMappings = {
-      HOME_WIN: ["1", "home", "Home"],
-      DRAW: ["X", "draw", "Draw", "Tie"],
-      AWAY_WIN: ["2", "away", "Away"],
-      YES: ["yes", "Yes", "1"],
-      NO: ["no", "No", "0"],
-      OVER: ["over", "Over"],
-      UNDER: ["under", "Under"],
+      HOME_WIN: ["1", "home", "Home", "HOME"],
+      DRAW: ["X", "x", "draw", "Draw", "DRAW", "Tie", "tie", "TIE"],
+      AWAY_WIN: ["2", "away", "Away", "AWAY"],
+      YES: ["yes", "Yes", "YES", "1"],
+      NO: ["no", "No", "NO", "0"],
+      OVER: ["over", "Over", "OVER"],
+      UNDER: ["under", "Under", "UNDER"],
     };
 
     this.typeIdMapping = {
@@ -268,10 +268,24 @@ class BetOutcomeCalculationService {
       actualResult = "DRAW";
     }
 
-    const betSelection = this.normalizeBetSelection(
-      bet.betOption || bet.selection
-    );
+    // Enhanced bet selection extraction - check multiple sources
+    const originalBetSelection = bet.betOption || 
+                                bet.selection || 
+                                bet.betDetails?.label || 
+                                bet.betDetails?.name;
+    
+    const betSelection = this.normalizeBetSelection(originalBetSelection);
     const isWinning = this.isResultMatch(betSelection, actualResult);
+
+    console.log(`[calculateMatchResult] Bet analysis:`, {
+      originalBetSelection,
+      normalizedBetSelection: betSelection,
+      actualResult,
+      homeScore,
+      awayScore,
+      isWinning,
+      betDetails: bet.betDetails
+    });
 
     return {
       status: isWinning ? "won" : "lost",
@@ -341,7 +355,12 @@ class BetOutcomeCalculationService {
     const scores = this.extractMatchScores(matchData);
     const bothTeamsScored = scores.homeScore > 0 && scores.awayScore > 0;
 
-    const betSelection = this.normalizeBetSelection(bet.betOption);
+    const originalBetSelection = bet.betOption || 
+                                bet.selection || 
+                                bet.betDetails?.label || 
+                                bet.betDetails?.name;
+    
+    const betSelection = this.normalizeBetSelection(originalBetSelection);
     const isYesBet = this.resultMappings.YES.includes(betSelection);
 
     const isWinning = isYesBet ? bothTeamsScored : !bothTeamsScored;
@@ -803,16 +822,41 @@ class BetOutcomeCalculationService {
     // Enhanced team identification - check betDetails first for market 86, then fallback to existing logic
     let teamGoals;
     let teamIdentifier = '';
+    let teamName = '';
+    
+    // Check if bet description contains team name for exact goals
+    if (bet.betDetails?.market_description) {
+      const description = bet.betDetails.market_description.toLowerCase();
+      const homeTeam = matchData.participants?.[0]?.name || 'home';
+      const awayTeam = matchData.participants?.[1]?.name || 'away';
+      
+      console.log(`[calculateTeamTotalGoals] Checking team from market description: "${bet.betDetails.market_description}"`);
+      console.log(`[calculateTeamTotalGoals] Home team: ${homeTeam}, Away team: ${awayTeam}`);
+      
+      if (description.includes(homeTeam.toLowerCase())) {
+        teamGoals = scores.homeScore;
+        teamName = homeTeam;
+        teamIdentifier = 'home';
+        console.log(`[calculateTeamTotalGoals] Identified as home team bet: ${homeTeam} scored ${teamGoals} goals`);
+      } else if (description.includes(awayTeam.toLowerCase())) {
+        teamGoals = scores.awayScore;
+        teamName = awayTeam;
+        teamIdentifier = 'away';
+        console.log(`[calculateTeamTotalGoals] Identified as away team bet: ${awayTeam} scored ${teamGoals} goals`);
+      }
+    }
     
     // For market 86 - use betDetails.label for team identification
-    if (bet.betDetails && bet.betDetails.market_id === "86" && bet.betDetails.label) {
+    if (!teamIdentifier && bet.betDetails && bet.betDetails.market_id === "86" && bet.betDetails.label) {
       teamIdentifier = bet.betDetails.label;
       
       // "1" means home team, "2" means away team
       if (teamIdentifier === "1") {
         teamGoals = scores.homeScore;
+        teamName = matchData.participants?.[0]?.name || 'Home';
       } else if (teamIdentifier === "2") {
         teamGoals = scores.awayScore;
+        teamName = matchData.participants?.[1]?.name || 'Away';
       } else {
         return {
           status: "canceled",
@@ -821,15 +865,19 @@ class BetOutcomeCalculationService {
           teamIdentifier: teamIdentifier
         };
       }
-    } else {
-      // Existing logic for other markets
+    }
+    
+    // Fallback to existing logic for other markets
+    if (!teamIdentifier) {
       const betOption = bet.betOption.toLowerCase();
       teamIdentifier = betOption;
       
       if (betOption.includes("home")) {
         teamGoals = scores.homeScore;
+        teamName = matchData.participants?.[0]?.name || 'Home';
       } else if (betOption.includes("away")) {
         teamGoals = scores.awayScore;
+        teamName = matchData.participants?.[1]?.name || 'Away';
       } else {
         return {
           status: "canceled",
@@ -837,6 +885,24 @@ class BetOutcomeCalculationService {
           reason: "Unable to determine team",
         };
       }
+    }
+
+    // Check if this is an exact goals bet (bet option contains number + "goal")
+    const exactGoalsMatch = bet.betOption.match(/(\d+)\s*goals?/i);
+    if (exactGoalsMatch) {
+      const targetGoals = parseInt(exactGoalsMatch[1]);
+      const isWinning = teamGoals === targetGoals;
+      
+      console.log(`[calculateTeamTotalGoals] Exact goals bet: ${teamName} scored ${teamGoals}, target was ${targetGoals}, winning: ${isWinning}`);
+      
+      return {
+        status: isWinning ? "won" : "lost",
+        payout: isWinning ? bet.stake * bet.odds : 0,
+        teamGoals: teamGoals,
+        targetGoals: targetGoals,
+        teamName: teamName,
+        reason: `${teamName} goals: ${teamGoals}, Target: ${targetGoals}`,
+      };
     }
 
     // For exact goals markets (market IDs 18, 19), check exact match
@@ -1608,6 +1674,27 @@ class BetOutcomeCalculationService {
       };
     }
 
+    // For inplay bets where we created a synthetic odd with winning: null,
+    // we need to fall back to manual calculation
+    if (selectedOdd.winning === null && bet.inplay) {
+      console.log(`[calculateOutcomeFromWinningField] Inplay bet with null winning field, falling back to manual calculation`);
+      
+      // Determine the correct market type from bet details
+      const marketId = bet.betDetails?.market_id || bet.marketId;
+      
+      // Check if this is actually a team goals market based on description
+      if (bet.betDetails?.market_description?.toLowerCase().includes('exact goals') ||
+          bet.betDetails?.market_description?.toLowerCase().includes('team goals') ||
+          bet.betDetails?.market_description?.toLowerCase().includes('total goals')) {
+        
+        console.log(`[calculateOutcomeFromWinningField] Detected team goals market, using team total goals calculation`);
+        return this.calculateTeamTotalGoals(bet, matchData);
+      }
+      
+      // Fall back to market type calculation
+      return this.calculateOutcomeByMarketType(bet, matchData, marketId);
+    }
+
     const isWinning = selectedOdd.winning === true;
 
     return {
@@ -1820,21 +1907,68 @@ class BetOutcomeCalculationService {
    * Find the selected odd in match data
    */
   findSelectedOdd(bet, matchData) {
+    console.log(`[findSelectedOdd] Looking for odd ID: ${bet.oddId}`);
+    console.log(`[findSelectedOdd] Bet is inplay: ${bet.inplay}`);
+    
+    // For inplay bets, we might not find the exact odd ID in final match data
+    // because live odds can have different IDs than post-match odds
+    // In this case, we should use the bet details to calculate the outcome directly
+    
     // Handle standard matchData.odds format
     if (matchData.odds && Array.isArray(matchData.odds)) {
-      return matchData.odds.find((odd) => odd.id == bet.oddId);
+      console.log(`[findSelectedOdd] Searching in matchData.odds (${matchData.odds.length} odds)`);
+      const found = matchData.odds.find((odd) => odd.id == bet.oddId);
+      if (found) {
+        console.log(`[findSelectedOdd] Found odd in matchData.odds:`, found);
+        return found;
+      }
     }
 
     // Handle response.json data format where odds are in data array
     if (matchData.data && Array.isArray(matchData.data)) {
-      return matchData.data.find((odd) => odd.id == bet.oddId);
+      console.log(`[findSelectedOdd] Searching in matchData.data (${matchData.data.length} odds)`);
+      const found = matchData.data.find((odd) => odd.id == bet.oddId);
+      if (found) {
+        console.log(`[findSelectedOdd] Found odd in matchData.data:`, found);
+        return found;
+      }
     }
 
     // Handle direct array format (if matchData itself is an array of odds)
     if (Array.isArray(matchData)) {
-      return matchData.find((odd) => odd.id == bet.oddId);
+      console.log(`[findSelectedOdd] Searching in direct array (${matchData.length} odds)`);
+      const found = matchData.find((odd) => odd.id == bet.oddId);
+      if (found) {
+        console.log(`[findSelectedOdd] Found odd in direct array:`, found);
+        return found;
+      }
     }
 
+    // For inplay bets, if we can't find the exact odd ID, 
+    // we should still be able to calculate the outcome using bet details
+    if (bet.inplay && bet.betDetails) {
+      console.log(`[findSelectedOdd] Inplay bet - odd ID not found, but we have bet details. Creating synthetic odd.`);
+      
+      // Create a synthetic odd object from bet details for calculation purposes
+      const syntheticOdd = {
+        id: bet.oddId,
+        value: bet.odds,
+        label: bet.betDetails.label,
+        name: bet.betDetails.name,
+        market_id: bet.betDetails.market_id,
+        market_description: bet.betDetails.market_description,
+        total: bet.betDetails.total,
+        handicap: bet.betDetails.handicap,
+        // For inplay bets where we can't find the exact odd, we can't use the winning field
+        // So we'll rely on manual calculation based on match data
+        winning: null
+      };
+      
+      console.log(`[findSelectedOdd] Created synthetic odd for inplay bet:`, syntheticOdd);
+      return syntheticOdd;
+    }
+
+    console.log(`[findSelectedOdd] Odd not found anywhere in match data`);
     return null;
   }
 
@@ -2095,20 +2229,37 @@ class BetOutcomeCalculationService {
    */
   isMatchFinished(matchData) {
     if (!matchData || !matchData.state) {
+      console.log(`[isMatchFinished] No match data or state available`);
       return false;
     }
 
+    console.log(`[isMatchFinished] Checking match state:`, {
+      id: matchData.state.id,
+      name: matchData.state.name
+    });
+
+    // Check by state ID first (more reliable)
+    if (matchData.state.id === 5) {
+      console.log(`[isMatchFinished] Match finished - state ID is 5`);
+      return true;
+    }
+
+    // Fallback to state name checking
     const matchState = matchData.state.name?.toLowerCase();
     const finishedStates = [
       "finished",
       "ended",
       "ft",
       "fulltime",
+      "full time", // Add "full time" with space
       "completed",
       "closed",
     ];
 
-    return finishedStates.includes(matchState);
+    const isFinished = finishedStates.includes(matchState);
+    console.log(`[isMatchFinished] State name check - matchState: "${matchState}", isFinished: ${isFinished}`);
+    
+    return isFinished;
   }
 
   /**

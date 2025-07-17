@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBetting } from '@/hooks/useBetting';
 import leaguesData, { getLiveLeagues } from '@/data/dummayLeagues';
-import { formatToLocalTime } from '@/lib/utils';
+import { formatToLocalTime, formatMatchTime } from '@/lib/utils';
 import LiveTimer from './LiveTimer';
 
 // League Card Component
@@ -52,7 +52,13 @@ const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
                                 {isInPlay && match.isLive ? (
                                     <LiveTimer startingAt={match.starting_at} />
                                 ) : (
-                                    match.time
+                                    match.starting_at ? (
+                                        <div>
+                                            {formatMatchTime(match.starting_at).date} - {formatMatchTime(match.starting_at).time}
+                                        </div>
+                                    ) : (
+                                        match.time
+                                    )
                                 )}
                             </div>
                             <div className="text-xs text-gray-500">
@@ -265,9 +271,9 @@ const LeagueCards = ({
                             const minutesSinceStart = Math.floor(timeSinceStart / (1000 * 60));
                             
                             // Consider match live if:
-                            // 1. State ID indicates live OR
-                            // 2. Match started within last 120 minutes (reasonable match duration)
-                            isMatchLive = liveStateIds.includes(match.state_id) || 
+                            
+                            // 1. Match started within last 120 minutes (reasonable match duration)
+                            isMatchLive = 
                                          (timeSinceStart > 0 && minutesSinceStart <= 120);
                         }
                         
