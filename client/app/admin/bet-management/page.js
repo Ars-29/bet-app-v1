@@ -247,7 +247,7 @@ export default function BetManagement() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[93%] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <header className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-4 md:mb-0">
@@ -961,13 +961,15 @@ export default function BetManagement() {
                       </div>
                     </TableHead>
                     <TableHead className="select-none">Match</TableHead>
+                    <TableHead className="select-none">Market</TableHead>
                     <TableHead className="select-none">Selection</TableHead>
+                    <TableHead className="select-none">Value</TableHead>
                     <TableHead
                       className="cursor-pointer select-none"
                       onClick={() => handleSort("payout")}
                     >
                       <div className="flex items-center gap-2">
-                        Payout
+                        Profit
                         <ArrowUpDown className="h-4 w-4" />
                       </div>
                     </TableHead>
@@ -1020,8 +1022,24 @@ export default function BetManagement() {
                             </div>
                           </TableCell>
                           <TableCell className="max-w-48">
+                            <div className="truncate" title={bet.betDetails?.market_description}>
+                              {bet.betDetails?.market_description || "-"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-48">
                             <div className="truncate" title={bet.selection}>
-                              {bet.selection || "-"}
+                              {bet.betDetails?.market_id === "37" 
+                                ? `${bet.betDetails?.label} ${bet.betDetails?.total} / ${bet.betDetails?.name}`
+                                : (bet.selection || "-")
+                              }
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-32">
+                            <div className="truncate" title={bet.betDetails?.total}>
+                              {bet.betDetails?.market_id === "37" 
+                                ? bet.betDetails?.total
+                                : (bet.betDetails?.total || "-")
+                              }
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1029,13 +1047,15 @@ export default function BetManagement() {
                               <span className="font-medium text-green-600">
                                 +$
                                 {bet.payout
-                                  ? bet.payout.toFixed(2)
-                                  : (bet.stake * bet.odds).toFixed(2)}
+                                  ? (bet.payout - bet.stake).toFixed(2)
+                                  : ((bet.stake * bet.odds) - bet.stake).toFixed(2)}
                               </span>
                             ) : bet.status.toLowerCase() === "pending" ? (
                               <span className="text-gray-500">Pending</span>
                             ) : (
-                              <span className="text-red-600">$0.00</span>
+                              <span className="font-medium text-red-600">
+                                -${bet.stake.toFixed(2)}
+                              </span>
                             )}
                           </TableCell>
                         </TableRow>

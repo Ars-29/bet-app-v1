@@ -80,7 +80,14 @@ const ClassifiedOddsDisplay = ({ matchData }) => {
                   >
                     <div className="flex justify-between items-center">
                       <div>
-                        <div className="font-medium text-gray-900">{odd.label}</div>
+                        <div className="font-medium text-gray-900">
+                          {/* Special handling for corners markets with total */}
+                          {marketData.market_description?.toLowerCase().includes('corners') && 
+                           (odd.label === 'Over' || odd.label === 'Under' || odd.label === 'Exactly') && 
+                           odd.total 
+                            ? `${odd.label} ${odd.total}`
+                            : odd.label}
+                        </div>
                         <div className="text-sm text-gray-500">{odd.probability}</div>
                       </div>
                       <div className="text-lg font-bold text-blue-600">

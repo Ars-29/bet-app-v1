@@ -231,15 +231,6 @@ const BettingHistoryPage = () => {
                     <TableRow className="bg-gray-50 text-[13px]">
                       <TableHead
                         className="cursor-pointer select-none"
-                        onClick={() => handleSort('id')}
-                      >
-                        <div className="flex items-center gap-2">
-                          ID
-                          <ArrowUpDown className="h-4 w-4" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none"
                         onClick={() => handleSort('stake')}
                       >
                         <div className="flex items-center gap-2">
@@ -265,10 +256,28 @@ const BettingHistoryPage = () => {
                           <ArrowUpDown className="h-4 w-4" />
                         </div>
                       </TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Match</TableHead>
-                      <TableHead>Selection</TableHead>
-                      <TableHead>Payout</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Status
+                          <ArrowUpDown className="h-4 w-4" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="select-none">Match</TableHead>
+                      <TableHead className="select-none">Market</TableHead>
+                      <TableHead className="select-none">Selection</TableHead>
+                      <TableHead className="select-none">Value</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none"
+                        onClick={() => handleSort('payout')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Profit
+                          <ArrowUpDown className="h-4 w-4" />
+                        </div>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -276,32 +285,63 @@ const BettingHistoryPage = () => {
                       const { date, time } = formatDateTime(item.createdAt);
                       return (
                         <TableRow key={item._id} className="hover:bg-gray-50 text-[13px]">
-                          <TableCell className="font-mono ">{item._id}</TableCell>
                           <TableCell>{formatAmount(item.stake)}</TableCell>
-                          <TableCell className="">{item.odds}</TableCell>
+                          <TableCell>{item.odds}</TableCell>
                           <TableCell>
-                            <div className="">
-                              <div className="">{date}</div>
+                            <div>
+                              <div>{date}</div>
                               <div className="text-gray-500">{time}</div>
                             </div>
                           </TableCell>
-                          <TableCell>{getStatusBadge(item.status)}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                item.status.toLowerCase() === 'won' 
+                                  ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                                  : item.status.toLowerCase() === 'lost'
+                                  ? 'text-rose-600 bg-rose-50 border-rose-200'
+                                  : 'text-amber-600 bg-amber-50 border-amber-200'
+                              }
+                            >
+                              {item.status}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="max-w-48">
                             <div className="truncate" title={item.teams}>
-                              {item.teams}
+                              {item.teams || "-"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-48">
+                            <div className="truncate" title={item.betDetails?.market_description}>
+                              {item.betDetails?.market_description || "-"}
                             </div>
                           </TableCell>
                           <TableCell className="max-w-48">
                             <div className="truncate" title={item.selection}>
-                              {item.selection}
+                              {item.betDetails?.market_id === "37" 
+                                ? `${item.betDetails?.label} ${item.betDetails?.total} / ${item.betDetails?.name}`
+                                : (item.selection || "-")
+                              }
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-32">
+                            <div className="truncate" title={item.betDetails?.total}>
+                              {item.betDetails?.market_id === "37" 
+                                ? item.betDetails?.total
+                                : (item.betDetails?.total || "-")
+                              }
                             </div>
                           </TableCell>
                           <TableCell>
-                            {item.status === 'won' ? (
+                            {item.status.toLowerCase() === "won" ? (
                               <span className="font-medium text-green-600">
-                                +${(item.stake * item.odds).toFixed(2)}
+                                +$
+                                {item.payout
+                                  ? (item.payout - item.stake).toFixed(2)
+                                  : ((item.stake * item.odds) - item.stake).toFixed(2)}
                               </span>
-                            ) : item.status === 'pending' ? (
+                            ) : item.status.toLowerCase() === "pending" ? (
                               <span className="text-gray-500">Pending</span>
                             ) : (
                               <span className="font-medium text-red-600">

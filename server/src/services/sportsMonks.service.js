@@ -11,15 +11,30 @@ class SportsMonksService {
 
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 15000,
+      timeout: 30000, // Increased timeout to 30 seconds
       params: {
         api_token: this.apiKey,
       },
-      // Handle potential SSL issues in development
-      httpsAgent:
-        process.env.NODE_ENV === "development"
-          ? new https.Agent({ rejectUnauthorized: false })
-          : undefined,
+      // Enhanced HTTPS agent configuration for better connection stability
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: process.env.NODE_ENV !== "development",
+        keepAlive: true,
+        keepAliveMsecs: 60000,
+        maxSockets: 10,
+        maxFreeSockets: 5,
+        timeout: 30000,
+        // Add socket timeout
+        scheduling: 'lifo'
+      }),
+      // Additional axios configuration for stability
+      maxRedirects: 3,
+      maxContentLength: 50 * 1024 * 1024, // 50MB max response size
+      maxBodyLength: 50 * 1024 * 1024,
+      headers: {
+        'Accept-Encoding': 'gzip, deflate', // Avoid br compression
+        'Connection': 'keep-alive',
+        'User-Agent': 'BetApp/1.0'
+      }
     }); // Request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {

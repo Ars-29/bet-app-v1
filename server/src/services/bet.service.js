@@ -50,16 +50,92 @@ class BetService {
     return market ? market.name : 'Unknown Market';
   }
 
+  // Helper method to get market ID by market name/title
+  getMarketIdByName(marketName) {
+    const marketsData = this.getMarketsData();
+    
+    // Search for market by name
+    for (const [id, market] of Object.entries(marketsData.markets)) {
+      if (market.name === marketName) {
+        return parseInt(id);
+      }
+    }
+    
+    // Fallback mapping for common market names
+    const marketNameMapping = {
+      'Fulltime Result': 1,
+      'Double Chance': 2,
+      'Match Goals': 4,
+      'Asian Handicap': 6,
+      'Both Teams To Score': 8,
+      'Exact Goals Number': 9,
+      'Highest Scoring Half': 10,
+      'Goals Over/Under': 11,
+      'First Goal Scorer': 12,
+      'Last Goal Scorer': 13,
+      'Anytime Goal Scorer': 14,
+      'Player To Score 2 Or More': 15,
+      'Correct Score': 16,
+      'Half Time Result': 17,
+      'Half Time/Full Time': 18,
+      'To Qualify': 19,
+      'Both Teams To Score - First Half': 20,
+      'Both Teams To Score - Second Half': 21,
+      'First Half Goals Over/Under': 22,
+      'Second Half Goals Over/Under': 23,
+      'Odd/Even Goals': 24,
+      'First Half Odd/Even Goals': 25,
+      'Second Half Odd/Even Goals': 26,
+      'First Team To Score': 27,
+      'Last Team To Score': 28,
+      'Winning Margin': 29,
+      'To Score In Both Halves': 30
+    };
+
+    return marketNameMapping[marketName] || null;
+  }
+
   // Helper method to create betDetails object
   createBetDetails(odds, marketId) {
-    const marketName = this.getMarketName(marketId);
+    // Ensure marketId is not undefined or null
+    let safeMarketId = marketId || odds.market_id;
+    
+    // If still no market ID, try to resolve it from market description
+    if (!safeMarketId || safeMarketId === 'unknown_market') {
+      if (odds.market_description) {
+        safeMarketId = this.getMarketIdByName(odds.market_description);
+      }
+      
+      // Final fallback to prevent errors
+      if (!safeMarketId || safeMarketId === 'unknown_market') {
+        console.warn(`[createBetDetails] Could not resolve market ID, using fallback ID 1 for odds:`, {
+          oddId: odds.id,
+          label: odds.label,
+          market_description: odds.market_description
+        });
+        safeMarketId = 1; // Default to "Fulltime Result"
+      }
+    }
+    
+    const marketName = this.getMarketName(safeMarketId);
+    
+    console.log(`[createBetDetails] Final market ID: ${safeMarketId}, market name: ${marketName}`);
+    
+    // Process the total field - keep it as string for descriptive totals like "Over 0.5", "Under 1.5"
+    let processedTotal = null;
+    if (odds.total !== undefined && odds.total !== null) {
+      // Always keep as string since it contains descriptive text like "Over 1.5", "Under 2.5"
+      processedTotal = String(odds.total);
+    }
+    
+    console.log(`[createBetDetails] Processing total: ${odds.total} -> ${processedTotal}`);
     
     return {
-      market_id: marketId,
+      market_id: safeMarketId,
       market_name: marketName,
       label: odds.label || odds.name || '',
       value: parseFloat(odds.value) || 0,
-      total: parseFloat(odds.total) || null,
+      total: processedTotal,
       market_description: odds.market_description || null,
       handicap: odds.handicap || null,
       name: odds.name || odds.label || ''
@@ -187,14 +263,7 @@ class BetService {
       // Get the betting_data array from the result
       const liveOdds = liveOddsResult.betting_data || [];
       
-      console.log(`[placeBet] Live odds structure:`, {
-        hasBettingData: !!liveOddsResult.betting_data,
-        bettingDataLength: liveOdds.length,
-        lookingForOddId: oddId,
-        oddIdType: typeof oddId,
-        oddIdAsNumber: parseInt(oddId),
-        oddIdAsString: oddId.toString()
-      });
+      
       
 
 
@@ -204,17 +273,8 @@ class BetService {
       
       // Search for the exact odd ID in all sections
       for (const section of liveOdds) {
-        console.log(`[placeBet] Checking section: ${section.title} with ${section.options?.length || 0} options`);
         
-        // Log all available odd IDs in this section for debugging
-        if (section.options && section.options.length > 0) {
-          const availableOddIds = section.options.map(o => ({ 
-            id: o.id, 
-            idType: typeof o.id, 
-            label: o.label 
-          }));
-          console.log(`[placeBet] Available odds in ${section.title}:`, availableOddIds);
-        }
+        
         
         // Simple exact match - convert both to numbers for comparison
         const odd = section.options?.find((o) => {
@@ -227,7 +287,7 @@ class BetService {
         if (odd) {
           foundOdd = odd;
           foundMarket = section;
-          console.log(`[placeBet] ✅ FOUND EXACT MATCH: ${odd.label} with ID: ${odd.id}`);
+          console.log(`[placeBet] ✅ FOUND EXACT MATCH: ${odd.label} with ID: ${odd.id}, market_id: ${odd.market_id}`);
           break;
         }
       }
@@ -252,14 +312,29 @@ class BetService {
         );
       }
 
+      // Use the market ID from the found odd (check both marketId and market_id)
+      const resolvedMarketId = foundOdd.marketId || foundOdd.market_id;
+
+      if (!resolvedMarketId) {
+        console.log(`[placeBet] ❌ No market ID found in live odd:`, foundOdd);
+        console.log(`[placeBet] Available properties:`, Object.keys(foundOdd));
+        throw new CustomError(
+          "Invalid live odd data - missing market ID",
+          400,
+          "INVALID_LIVE_ODD_DATA"
+        );
+      }
+
+      console.log(`[placeBet] Using market ID: ${resolvedMarketId} for "${foundOdd.label}" (from ${foundOdd.marketId ? 'marketId' : 'market_id'})`);
+
       odds = {
         id: foundOdd.id,
         value: foundOdd.value,
         name: foundOdd.name || foundOdd.label,
-        market_id: foundMarket.marketId || foundMarket.id || foundMarket.market_id,
+        market_id: resolvedMarketId,
         label: foundOdd.label,
         total: foundOdd.total,
-        market_description: foundMarket.description,
+        market_description: foundOdd.market_description || foundMarket.description || foundMarket.title,
         handicap: foundOdd.handicap
       };
     }
@@ -470,6 +545,9 @@ class BetService {
   }
 
   async fetchMatchResult(matchId, isLive = false) {
+    const maxRetries = 3;
+    let lastError;
+
     try {
       // Check cache first
       if (this.finalMatchResultCache.has(matchId)) {
@@ -478,54 +556,91 @@ class BetService {
         return cachedData;
       }
 
-      // For both live and non-live matches, get state, scores, participants and odds in one call
-      const response = await SportsMonksService.client.get(
-        `/football/fixtures/${matchId}`,
-        {
-          params: {
-            include: 
-              "state;inplayOdds;scores;participants;lineups.details;events;statistics;odds"  
-          },
+      // Retry logic for API calls
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[fetchMatchResult] Attempt ${attempt}/${maxRetries} for matchId: ${matchId}`);
+          
+          // Use minimal includes to reduce response size and avoid timeouts
+          const includes=
+             "state;inplayOdds;scores;participants;lineups.details;events;statistics;odds" // Minimal on first attempt
+            
+          const response = await SportsMonksService.client.get(
+            `/football/fixtures/${matchId}`,
+            {
+              params: {
+                include: includes
+              },
+              timeout: attempt === 1 ? 10000 : attempt === 2 ? 20000 : 30000, // Increase timeout with each attempt
+              headers: {
+                'Accept-Encoding': 'gzip, deflate', // Avoid br compression which might cause issues
+                'Connection': 'keep-alive'
+              }
+            }
+          );
+
+          if (!response.data?.data) {
+            throw new CustomError("Match not found", 404, "MATCH_NOT_FOUND");
+          }
+
+          console.log(`[fetchMatchResult] Successfully fetched data on attempt ${attempt} for matchId: ${matchId}`);
+
+          const data = response.data.data;
+
+          // The response contains match data at the root level
+          const matchData = {
+            name: data.name,
+            id: matchId,
+            state: data.state,
+            scores: data.scores || [],
+            participants: data.participants,
+            starting_at: data.starting_at,
+            odds: data.odds,
+            inplayodds: data.inplayodds || [],
+            lineups: data.lineups || [],
+            events: data.events || [],
+            statistics: data.statistics || [],
+          };
+
+          // Cache the match data if the match is finished (state.id === 5)
+          if (matchData.state?.id === 5) {
+            this.finalMatchResultCache.set(matchId, matchData);
+            console.log(`[fetchMatchResult] Cached final result for matchId: ${matchId}`);
+          }
+
+          return matchData;
+
+        } catch (error) {
+          lastError = error;
+          console.error(`[fetchMatchResult] Attempt ${attempt} failed for matchId: ${matchId}:`, error.message);
+          
+          // If it's a connection reset error and we have more attempts, wait before retrying
+          if ((error.code === 'ECONNRESET' || error.code === 'ECONNABORTED' || error.message.includes('aborted')) && attempt < maxRetries) {
+            const waitTime = attempt * 2000; // 2s, 4s wait times
+            console.log(`[fetchMatchResult] Waiting ${waitTime}ms before retry ${attempt + 1}`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
+          
+          // If it's not a retry-able error or last attempt, throw
+          if (attempt === maxRetries) {
+            throw error;
+          }
         }
-      );
-
-      if (!response.data?.data) {
-        throw new CustomError("Match not found", 404, "MATCH_NOT_FOUND");
       }
 
-      // Add debug logging
-      console.log(
-        `[fetchMatchResult] Raw response data:`,
-        JSON.stringify(response.data.data, null, 2)
-      );
-
-      const data = response.data.data;
-
-      // The response contains match data at the root level
-      const matchData = {
-        name: data.name,
-        id: matchId,
-        state: data.state,
-        scores: data.scores || [],
-        participants: data.participants,
-        starting_at: data.starting_at,
-        odds:  data.odds,
-        inplayodds : data.inplayodds || [],
-        participants: data.participants,
-        lineups: data.lineups || [],
-        events: data.events,
-        statistics: data.statistics || [],
-      };
-
-      // Cache the match data if the match is finished (state.id === 5)
-      if (matchData.state?.id === 5) {
-        this.finalMatchResultCache.set(matchId, matchData);
-        console.log(`[fetchMatchResult] Cached final result for matchId: ${matchId}`);
-      }
-
-      return matchData;
     } catch (error) {
-      console.error(`[fetchMatchResult] Error:`, error.message);
+      console.error(`[fetchMatchResult] All attempts failed for matchId: ${matchId}. Final error:`, error.message);
+      
+      // If it's a network error, try to provide a more user-friendly error
+      if (error.code === 'ECONNRESET' || error.code === 'ECONNABORTED' || error.message.includes('aborted')) {
+        throw new CustomError(
+          `Unable to fetch match data due to network connectivity issues. Please try again later.`,
+          503,
+          "NETWORK_ERROR"
+        );
+      }
+      
       throw error;
     }
   }
@@ -573,6 +688,25 @@ class BetService {
           }
         } catch (err) {
           console.error(`[checkBetOutcome] Error fetching match:`, err);
+          
+          // Handle network errors gracefully
+          if (err.code === 'ECONNRESET' || err.code === 'ECONNABORTED' || 
+              err.message.includes('aborted') || err.message.includes('NETWORK_ERROR')) {
+            
+            console.log(`[checkBetOutcome] Network error for betId: ${betId}. Rescheduling for retry in 10 minutes.`);
+            
+            // Reschedule for retry in 10 minutes due to network issues
+            const runAt = new Date(Date.now() + 10 * 60 * 1000);
+            agenda.schedule(runAt, "checkBetOutcome", { betId, matchId: bet.matchId });
+            
+            return {
+              betId: bet._id,
+              status: bet.status,
+              message: "Network error, rescheduled for retry"
+            };
+          }
+          
+          // For other errors, throw as before
           throw err;
         }
       }
@@ -585,21 +719,21 @@ class BetService {
 
     //NOTE: Dont remove it i will uncomment it
     // Check if match is finished (state.id === 5 means finished)
-    // if (!matchData.state || matchData.state.id !== 5) {
-    //   console.log(`[checkBetOutcome] Match not finished for betId: ${betId}, state:`, matchData.state);
+    if (!matchData.state || matchData.state.id !== 5) {
+      console.log(`[checkBetOutcome] Match not finished for betId: ${betId}, state:`, matchData.state);
 
-    //   // If match hasn't started yet or is in progress, reschedule for estimated end time
-    //   if (!matchData.state || matchData.state.id === 1 || (matchData.state.id >= 2 && matchData.state.id <= 4)) {
-    //     console.log(`[checkBetOutcome] Match is not yet finished (state: ${matchData.state?.name}). Rescheduling for estimated end time.`);
-    //     agenda.schedule(bet.estimatedMatchEnd, "checkBetOutcome", { betId, matchId: bet.matchId });
-    //   } else {
-    //     // For other states, check again in 10 minutes
-    //     const runAt = new Date(Date.now() + 10 * 60 * 1000);
-    //     agenda.schedule(runAt, "checkBetOutcome", { betId, matchId: bet.matchId });
-    //   }
+      // If match hasn't started yet or is in progress, reschedule for estimated end time
+      if (!matchData.state || matchData.state.id === 1 || (matchData.state.id >= 2 && matchData.state.id <= 4)) {
+        console.log(`[checkBetOutcome] Match is not yet finished (state: ${matchData.state?.name}). Rescheduling for estimated end time.`);
+        agenda.schedule(bet.estimatedMatchEnd, "checkBetOutcome", { betId, matchId: bet.matchId });
+      } else {
+        // For other states, check again in 10 minutes
+        const runAt = new Date(Date.now() + 10 * 60 * 1000);
+        agenda.schedule(runAt, "checkBetOutcome", { betId, matchId: bet.matchId });
+      }
 
-    //   return { betId, status: bet.status, message: "Match not yet finished, rescheduled" };
-    // }
+      return { betId, status: bet.status, message: "Match not yet finished, rescheduled" };
+    }
    
    // Prepare match data for outcome calculation
    let final_match = matchData;
@@ -614,6 +748,14 @@ class BetService {
    // Calculate bet outcome using the BetOutcomeCalculationService
    try {
      console.log(`[checkBetOutcome] Calculating outcome for betId: ${betId}`);
+     console.log(`[checkBetOutcome] Bet details:`, {
+       oddId: bet.oddId,
+       betOption: bet.betOption,
+       inplay: bet.inplay,
+       marketId: bet.marketId,
+       betDetails: bet.betDetails
+     });
+     
      const outcomeResult = await this.outcomeCalculator.calculateBetOutcome(bet, final_match);
      
      console.log(`[checkBetOutcome] Outcome calculated:`, outcomeResult);

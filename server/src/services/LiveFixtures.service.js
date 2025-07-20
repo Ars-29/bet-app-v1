@@ -240,10 +240,25 @@ class LiveFixturesService {
     
     const grouped = this.bindLeaguesToMatches(liveMatches).map(group => ({
       league: group.league,
-      matches: group.matches.map(match => ({
-        ...match,
-        odds: [], 
-      })),
+      matches: group.matches.map(match => {
+        // Get cached odds for this match
+        const cachedOdds = this.liveOddsCache.get(match.id);
+        console.log(`[getLiveMatchesFromCache] Match ${match.id} cached odds:`, {
+          hasCache: !!cachedOdds,
+          hasBettingData: !!(cachedOdds && cachedOdds.betting_data),
+          bettingDataLength: cachedOdds && cachedOdds.betting_data ? cachedOdds.betting_data.length : 0
+        });
+        
+        const mainOdds = cachedOdds && cachedOdds.betting_data ? 
+          this.extractMainOdds(cachedOdds.betting_data) : {};
+        
+        console.log(`[getLiveMatchesFromCache] Match ${match.id} main odds:`, mainOdds);
+        
+        return {
+          ...match,
+          odds: mainOdds, // Include the main 1X2 odds
+        };
+      }),
     }));
     
     console.log(`[LiveFixtures] Returning ${grouped.length} league groups with live matches`);
@@ -256,7 +271,7 @@ class LiveFixturesService {
     const apiToken = process.env.SPORTSMONKS_API_KEY;
     
     // Define the same allowed market IDs as in fixture.service.js
-    const allowedMarketIds = [1, 2, 267, 268, 29, 90, 93, 95, 124, 125, 10, 14, 18, 19, 33, 38, 39, 41, 44, 50, 51];
+    const allowedMarketIds = [1, 2, 267, 268, 29, 90, 93, 95, 124, 125, 10, 14, 18, 19, 33, 38, 39, 41, 44, 50, 51,267,268,4,5,81,37,11 , 97 , 13,86,80 ,60,67,68,69];
     
     if (!apiToken) {
       console.error("❌ SPORTSMONKS_API_KEY is not set");
@@ -270,14 +285,16 @@ class LiveFixturesService {
       for (const match of group.matches) {
         totalMatches++;
         try {
-          // Use the inplay odds endpoint
-          const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${match.id}?api_token=${apiToken}&filters=bookmakers:2`;
+          // Use the fixture endpoint with inplayOdds included
+          const url = `https://api.sportmonks.com/v3/football/fixtures/${match.id}?api_token=${apiToken}&include=inplayOdds&filters=bookmakers:2`;
           
           const response = await axios.get(url);
-          const allOdds = response.data?.data || [];
-          
+          const allOdds = response.data?.data?.inplayodds || [];
+          console.log("Length of odds: ",allOdds.length);
+
           // Filter odds by allowed market IDs
           let filteredOdds = allOdds.filter(odd => allowedMarketIds.includes(odd.market_id));
+          console.log("Length of filtered odds: ",filteredOdds.length);
           
           // Apply player validation for market IDs 267 and 268
           filteredOdds = this.validatePlayerOdds(filteredOdds, match);
@@ -307,6 +324,11 @@ class LiveFixturesService {
           
           // Cache the result
           this.liveOddsCache.set(match.id, result);
+          console.log(`[updateAllLiveOdds] Cached odds for match ${match.id}:`, {
+            bettingDataSections: result.betting_data.length,
+            totalOptions: result.betting_data.reduce((sum, section) => sum + (section.options?.length || 0), 0),
+            cacheKey: match.id
+          });
           successfulUpdates++;
         } catch (err) {
           console.error(`❌ Failed to update betting_data for match ${match.id}:`, err.message);
@@ -369,12 +391,15 @@ class LiveFixturesService {
     const allowedMarketIds = [1, 2, 267, 268, 29, 90, 93, 95, 124, 125, 10, 14, 18, 19, 33, 38, 39, 41, 44, 50, 51];
 
     try {
-      const url = `https://api.sportmonks.com/v3/football/odds/inplay/fixtures/${matchId}?api_token=${apiToken}&filters=bookmakers:2`;
+      const url = `https://api.sportmonks.com/v3/football/fixtures/${matchId}?api_token=${apiToken}&include=inplayOdds&filters=bookmakers:2`;
       const response = await axios.get(url);
-      const allOddsData = response.data?.data || [];
-      
+      const allOddsData = response.data?.data?.inplayodds || [];
+       console.log("Length of odds: ",allOddsData.length);
+
       // Filter odds by allowed market IDs
       let oddsData = allOddsData.filter(odd => allowedMarketIds.includes(odd.market_id));
+       console.log("Length of filtered odds: ",oddsData.length);
+
       
       // Get match data to pass to transformToBettingData for team names AND player validation
       let matchData = null;
@@ -463,51 +488,65 @@ class LiveFixturesService {
 
   // Extract only 1, X, 2 odds for inplay display
   extractMainOdds(bettingData) {
-    if (!Array.isArray(bettingData) || bettingData.length === 0) {
+    if (!Array.isArray(bettingData)) {
+      console.log(`[extractMainOdds] bettingData is not an array:`, typeof bettingData);
       return {};
     }
     
-    // Look for the Full Time Result section in betting data
-    const fullTimeSection = bettingData.find(section => 
-      section.category === 'full-time' && 
-      (section.title?.toLowerCase().includes('result') || 
-       section.title?.toLowerCase().includes('fulltime') ||
-       section.title?.toLowerCase().includes('1x2'))
+    console.log(`[extractMainOdds] Processing ${bettingData.length} betting data sections`);
+    console.log(`[extractMainOdds] Section titles:`, bettingData.map(section => section.title));
+    
+    // Find the main market (1x2) section in betting data
+    const mainMarketSection = bettingData.find(section => 
+      section.title === 'Match Result' || 
+      section.title === '1X2' || 
+      section.title === 'Fulltime Result' ||  // Add this variation
+      section.market_id === 1
     );
     
-    if (!fullTimeSection || !fullTimeSection.options) {
+    if (!mainMarketSection || !mainMarketSection.options) {
+      console.log(`[extractMainOdds] No main market section found in betting data`);
+      console.log(`[extractMainOdds] Available sections:`, bettingData.map(s => ({ title: s.title, market_id: s.market_id, hasOptions: !!s.options })));
       return {};
     }
     
-    // Extract home, draw, away odds from the options
-    const homeOdd = fullTimeSection.options.find(o => 
-      o.label === "1" || 
-      o.label?.toLowerCase() === "home" ||
-      o.team === "home" ||
-      // Check if label contains team name (after transformation)
-      (o.label && !o.label.toLowerCase().includes('draw') && !o.label.toLowerCase().includes('tie'))
-    );
+    console.log(`[extractMainOdds] Found main market section:`, {
+      title: mainMarketSection.title,
+      market_id: mainMarketSection.market_id,
+      optionsCount: mainMarketSection.options.length
+    });
     
-    const drawOdd = fullTimeSection.options.find(o => 
-      o.label === "X" || 
-      o.label?.toLowerCase() === "draw" ||
-      o.label?.toLowerCase() === "tie"
-    );
+    const result = {};
     
-    const awayOdd = fullTimeSection.options.find(o => 
-      o.label === "2" || 
-      o.label?.toLowerCase() === "away" ||
-      o.team === "away" ||
-      // For the third option that's not home or draw
-      (o !== homeOdd && o !== drawOdd && o.label && !o.label.toLowerCase().includes('draw') && !o.label.toLowerCase().includes('tie'))
-    );
-
-    const result = {
-      home: homeOdd ? { value: homeOdd.value, oddId: homeOdd.id, name: homeOdd.label || 'Home Win' } : undefined,
-      draw: drawOdd ? { value: drawOdd.value, oddId: drawOdd.id, name: drawOdd.label || 'Draw' } : undefined,
-      away: awayOdd ? { value: awayOdd.value, oddId: awayOdd.id, name: awayOdd.label || 'Away Win' } : undefined,
-    };
+    // Extract home, draw, away odds with suspended status
+    mainMarketSection.options.forEach(option => {
+      const label = option.label?.toLowerCase();
+      const name = option.name?.toLowerCase();
+      
+      console.log(`[extractMainOdds] Processing option:`, { label, name, value: option.value, id: option.id });
+      
+      if (label === "home" || label === "1" || name === "home" || name === "1") {
+        result.home = { 
+          value: option.value, 
+          oddId: option.id,
+          suspended: option.suspended || false
+        };
+      } else if (label === "draw" || label === "x" || name === "draw" || name === "x") {
+        result.draw = { 
+          value: option.value, 
+          oddId: option.id,
+          suspended: option.suspended || false
+        };
+      } else if (label === "away" || label === "2" || name === "away" || name === "2") {
+        result.away = { 
+          value: option.value, 
+          oddId: option.id,
+          suspended: option.suspended || false
+        };
+      }
+    });
     
+    console.log(`[extractMainOdds] Extracted odds with suspended status:`, result);
     return result;
   }
 
