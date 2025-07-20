@@ -1,6 +1,6 @@
 import express from "express";
 import BetController from "../controllers/bet.controller.js";
-import { authenticateToken } from "../middlewares/auth.js";
+import { authenticateToken, requireAdmin } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -17,6 +17,6 @@ router.get("/:betId/outcome", authenticateToken, BetController.checkBetOutcome);
 router.get("/pending/check", authenticateToken, BetController.checkPendingBets);
 
 //WARNING: This route is for admin use only, to get all bets
-router.get("/admin/all", authenticateToken, BetController.getAllBets);
+router.get("/admin/all", authenticateToken, requireAdmin, BetController.getAllBets);
 
 export default router;

@@ -152,6 +152,11 @@ const authSlice = createSlice({
         state.message = action.payload.message;
         state.error = null;
 
+        // Store token in localStorage as fallback for cookie issues
+        if (action.payload.accessToken && typeof window !== 'undefined') {
+          localStorage.setItem('accessToken', action.payload.accessToken);
+        }
+
         console.log(action.payload);
         console.log("User logged in:", state.user);
       })
@@ -173,6 +178,11 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.message = action.payload.message;
         state.error = null;
+
+        // Clear token from localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken');
+        }
       })
       .addCase(logout.rejected, (state, action) => {
         state.isLoading = false;
@@ -180,6 +190,11 @@ const authSlice = createSlice({
         // Even if logout fails, clear the user state
         state.user = null;
         state.isAuthenticated = false;
+
+        // Clear token from localStorage even if logout fails
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken');
+        }
       })
 
       // Get me cases
@@ -201,6 +216,12 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
         state.isInitialized = true;
+        
+        // Clear any stale tokens from localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken');
+        }
+        
         // Don't set error for getMe failures as they're expected when not logged in
       })
 

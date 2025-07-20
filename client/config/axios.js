@@ -10,18 +10,24 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor - logs outgoing requests
+// Request interceptor - logs outgoing requests and includes auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const timestamp = new Date().toISOString();
+    // Check if we have a token in localStorage (fallback for cookie issues)
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     
+    const timestamp = new Date().toISOString();
     console.log('📍 Full URL:', `METHOD: ${config.method.toUpperCase()}   ${config.baseURL}${config.url}`);
-   
     
     if (config.data) {
       console.log('📦 Request Body:', config.data);
     }
- 
+    
     return config;
   },
   (error) => {

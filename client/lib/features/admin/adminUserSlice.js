@@ -1,8 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-
-// API base URL
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import apiClient from "@/config/axios";
 
 // Async thunks for API calls
 export const fetchUsers = createAsyncThunk(
@@ -18,26 +15,12 @@ export const fetchUsers = createAsyncThunk(
       // In this case, we want to get as many users as possible
       const isForFiltering = limit > 20;
 
-      const response = await fetch(
-        `${API_BASE_URL}/users?page=${page}&limit=${
-          isForFiltering ? 100 : limit
-        }`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-        }
+      const response = await apiClient.get(
+        `/users?page=${page}&limit=${isForFiltering ? 100 : limit}`
       );
 
-      const data = await response.json();
+      const data = response.data;
       console.log("Users API response:", data);
-
-      if (!response.ok) {
-        console.error("Users API error:", data);
-        return rejectWithValue(data);
-      }
 
       // Ensure pagination data is always properly structured
       if (!data.pagination) {
@@ -53,11 +36,13 @@ export const fetchUsers = createAsyncThunk(
       return data;
     } catch (error) {
       console.error("Users fetch error:", error);
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -71,30 +56,16 @@ export const searchUsers = createAsyncThunk(
         return { users: [], success: true };
       }
 
-      const response = await fetch(
-        `${API_BASE_URL}/users/search?name=${searchQuery}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
+      const response = await apiClient.get(`/users/search?name=${searchQuery}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
         }
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data);
-      }
-
-      return data;
-    } catch (error) {
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
     }
   }
 );
@@ -104,31 +75,21 @@ export const updateUserStatus = createAsyncThunk(
   async ({ userId, isActive }, { rejectWithValue }) => {
     try {
       console.log("Updating user status:", { userId, isActive });
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ isActive }),
-      });
-
-      const data = await response.json();
+      const response = await apiClient.patch(`/users/${userId}/status`, { isActive });
+      
+      const data = response.data;
       console.log("Update status API response:", data);
-
-      if (!response.ok) {
-        console.error("Update status API error:", data);
-        return rejectWithValue(data);
-      }
 
       return data;
     } catch (error) {
       console.error("Update status error:", error);
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -138,30 +99,21 @@ export const fetchUserDetails = createAsyncThunk(
   async (userId, { rejectWithValue }) => {
     try {
       console.log("Fetching user details for ID:", userId);
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
+      const response = await apiClient.get(`/users/${userId}`);
+      
+      const data = response.data;
       console.log("User details API response:", data);
-
-      if (!response.ok) {
-        console.error("User details API error:", data);
-        return rejectWithValue(data);
-      }
 
       return data;
     } catch (error) {
       console.error("User details fetch error:", error);
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -171,49 +123,30 @@ export const updateUserDetails = createAsyncThunk(
   async ({ userId, userData }, { rejectWithValue }) => {
     try {
       console.log("Updating user details:", { userId, userData });
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json();
+      const response = await apiClient.put(`/users/${userId}`, userData);
+      
+      const data = response.data;
       console.log("Update details API response:", data);
-
-      if (!response.ok) {
-        console.error("Update details API error:", data);
-        return rejectWithValue(data);
-      }
 
       // If the response is successful but doesn't contain user data, fetch the updated user
       if (!data.user && !data._id) {
         console.log("Fetching updated user details after update");
-        const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-        });
-
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          console.log("Fetched updated user data:", userData);
-          return userData;
-        }
+        const userResponse = await apiClient.get(`/users/${userId}`);
+        const userData = userResponse.data;
+        console.log("Fetched updated user data:", userData);
+        return userData;
       }
 
       return data;
     } catch (error) {
       console.error("Update details error:", error);
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -223,31 +156,21 @@ export const createUser = createAsyncThunk(
   async (userData, { rejectWithValue }) => {
     try {
       console.log("Creating user with data:", userData);
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(userData),
-      });
-
-      const data = await response.json();
+      const response = await apiClient.post("/users", userData);
+      
+      const data = response.data;
       console.log("Create user API response:", data);
-
-      if (!response.ok) {
-        console.error("Create user API error:", data);
-        return rejectWithValue(data);
-      }
 
       return data;
     } catch (error) {
       console.error("Create user error:", error);
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -256,31 +179,22 @@ export const fetchUserStats = createAsyncThunk(
   "adminUsers/fetchUserStats",
   async (_, { rejectWithValue }) => {
     try {
-      console.log("Fetching stats from:", `${API_BASE_URL}/users/stats`);
-      const response = await fetch(`${API_BASE_URL}/users/stats`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
+      console.log("Fetching stats from:", `/users/stats`);
+      const response = await apiClient.get("/users/stats");
+      
+      const data = response.data;
       console.log("Stats API response:", data);
-
-      if (!response.ok) {
-        console.error("Stats API error:", data);
-        return rejectWithValue(data);
-      }
 
       return data;
     } catch (error) {
       console.error("Stats fetch error:", error);
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );
@@ -290,30 +204,21 @@ export const deleteUser = createAsyncThunk(
   async (userId, { rejectWithValue }) => {
     try {
       console.log("Deleting user with ID:", userId);
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      const data = await response.json();
+      const response = await apiClient.delete(`/users/${userId}`);
+      
+      const data = response.data;
       console.log("Delete user API response:", data);
-
-      if (!response.ok) {
-        console.error("Delete user API error:", data);
-        return rejectWithValue(data);
-      }
 
       return { userId, message: data.message };
     } catch (error) {
       console.error("Delete user error:", error);
-      return rejectWithValue({
-        success: false,
-        message: "Network error occurred",
-        error: error.message,
-      });
+      return rejectWithValue(
+        error.response?.data || {
+          success: false,
+          message: "Network error occurred",
+          error: error.message,
+        }
+      );
     }
   }
 );

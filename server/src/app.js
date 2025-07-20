@@ -32,9 +32,12 @@ app.use(
   cors({
     origin: [
       process.env.CLIENT_URL || "http://localhost:3000",
-      "https://betting-website-tau.vercel.app/", // Add your Vercel domain
+      "https://betting-website-tau.vercel.app", // Remove trailing slash
+      "https://betting-website-tau.vercel.app/",
     ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 app.use(express.json());

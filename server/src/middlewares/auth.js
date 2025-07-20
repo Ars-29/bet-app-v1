@@ -1,10 +1,19 @@
 import { verifyToken } from "../utils/jwt.js";
 import User from "../models/User.js";
 
-// Middleware to verify JWT token from cookies
+// Middleware to verify JWT token from cookies or Authorization header
 export const authenticateToken = async (req, res, next) => {
   try {
-    const token = req.cookies.accessToken;
+    // First try to get token from cookies
+    let token = req.cookies.accessToken;
+    
+    // If no cookie token, try Authorization header
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
 
     if (!token) {
       return res.status(401).json({
