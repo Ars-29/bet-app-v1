@@ -97,9 +97,11 @@ agenda.define("checkBetOutcome", async (job) => {
 });
 
 // Define the Agenda job for updating live odds
+// Scheduled job to update live match odds every 3 minutes
 agenda.define("updateLiveOdds", async (job) => {
   try {
     await liveFixturesService.updateAllLiveOdds();
+    // Log successful completion of live odds update job
     console.log(`[Agenda] Live odds updated at ${new Date().toISOString()}`);
   } catch (error) {
     console.error("[Agenda] Error updating live odds:", error);
@@ -118,6 +120,7 @@ agenda.on("ready", () => {
 agenda.on("error", (err) => {
   console.error("[Agenda] Error:", err);
 });
+// Log when agenda jobs start executing
 agenda.on("start", (job) => {
   console.log(`[Agenda] Job ${job.attrs.name} starting. Data:`, job.attrs.data);
 });

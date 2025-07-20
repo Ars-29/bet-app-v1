@@ -68,7 +68,8 @@ class LiveFixturesService {
     });
 
     if (lineupPlayerNames.size === 0) {
-      console.log(`[LiveFixtures] No players found in lineups for match ${matchData.id}`);
+      // Log when no players are found in match lineups for validation
+    console.log(`[LiveFixtures] No players found in lineups for match ${matchData.id}`);
       return odds; // Return all odds if no players in lineups
     }
 
@@ -106,6 +107,7 @@ class LiveFixturesService {
       return true;
     });
 
+    // Log player validation results showing how many odds were filtered
     console.log(`[LiveFixtures] Player validation: ${odds.length} odds → ${validatedOdds.length} validated odds for match ${matchData.id}`);
     return validatedOdds;
   }
@@ -261,6 +263,7 @@ class LiveFixturesService {
       }),
     }));
     
+    // Log the number of league groups containing live matches
     console.log(`[LiveFixtures] Returning ${grouped.length} league groups with live matches`);
     return grouped;
   }
@@ -290,11 +293,13 @@ class LiveFixturesService {
           
           const response = await axios.get(url);
           const allOdds = response.data?.data?.inplayodds || [];
-          console.log("Length of odds: ",allOdds.length);
+          // Log the total number of odds fetched from API for a match
+    console.log("Length of odds: ",allOdds.length);
 
           // Filter odds by allowed market IDs
           let filteredOdds = allOdds.filter(odd => allowedMarketIds.includes(odd.market_id));
-          console.log("Length of filtered odds: ",filteredOdds.length);
+          // Log the number of odds after filtering for valid markets
+    console.log("Length of filtered odds: ",filteredOdds.length);
           
           // Apply player validation for market IDs 267 and 268
           filteredOdds = this.validatePlayerOdds(filteredOdds, match);
@@ -324,7 +329,8 @@ class LiveFixturesService {
           
           // Cache the result
           this.liveOddsCache.set(match.id, result);
-          console.log(`[updateAllLiveOdds] Cached odds for match ${match.id}:`, {
+          // Log caching details for live match odds including betting data sections and options count
+    console.log(`[updateAllLiveOdds] Cached odds for match ${match.id}:`, {
             bettingDataSections: result.betting_data.length,
             totalOptions: result.betting_data.reduce((sum, section) => sum + (section.options?.length || 0), 0),
             cacheKey: match.id
@@ -339,6 +345,7 @@ class LiveFixturesService {
       }
     }
     
+    // Log the final update summary showing how many live matches were successfully updated
     console.log(`[LiveFixtures] Updated ${successfulUpdates}/${totalMatches} live matches with player validation`);
   }
 

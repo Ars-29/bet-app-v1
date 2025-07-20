@@ -41,13 +41,17 @@ class FixtureOptimizationService {
       .split("T")[0];
     const cacheKey = `fixtures_today_to_7days_${startDate}_${endDate}`;
 
+    // Log when searching for fixtures in cache with specific key
     console.log(`🔍 Looking for cache key: ${cacheKey}`);
+    // Log the date range being used for fixture search
     console.log(`📅 Date range: ${startDate} to ${endDate}`);
 
     // Check cache first
     const cached = this.fixtureCache.get(cacheKey);
     if (cached) {
+      // Log when returning fixtures data from cache instead of API
       console.log("📦 Returning cached fixtures data");
+      // Log the type and size of cached data
       console.log(
         `📊 Cached data type: ${
           cached instanceof Map
@@ -91,7 +95,8 @@ class FixtureOptimizationService {
         
         while (retries > 0) {
           try {
-            console.log(`📡 Fetching page ${page}... (attempt ${4 - retries}/3)`);
+            // Log API pagination attempts with retry count
+      console.log(`📡 Fetching page ${page}... (attempt ${4 - retries}/3)`);
             response = await sportsMonksService.client.get(pageUrl, {
               params,
               timeout: 30000, // Increase timeout to 30 seconds
@@ -114,7 +119,8 @@ class FixtureOptimizationService {
         }
         
         const data = response.data?.data || [];
-        console.log(`📊 Page ${page} returned ${data.length} fixtures`);
+        // Log the number of fixtures returned for each page during API pagination
+      console.log(`📊 Page ${page} returned ${data.length} fixtures`);
         allFixtures = allFixtures.concat(data);
         const pagination = response.data?.pagination;
         if (pagination && pagination.has_more && pagination.next_page) {
@@ -125,19 +131,22 @@ class FixtureOptimizationService {
           pageUrl = null;
         }
       }
+      // Log the total number of fixtures fetched from all API pages
       console.log(`✅ Total fixtures fetched: ${allFixtures.length}`);
 
       // Transform and cache as a Map
       const transformedArr = this.transformFixturesData(allFixtures);
+      // Log the number of fixtures after transformation and filtering
       console.log(`🔄 Transformed fixtures: ${transformedArr.length}`);
 
       const transformed = new Map();
       for (const fixture of transformedArr) {
         transformed.set(fixture.id, fixture);
       }
-      console.log(
-        `💾 Caching ${transformed.size} fixtures with key: ${cacheKey}`
-      );
+              // Log caching operation with fixture count and cache key
+        console.log(
+          `💾 Caching ${transformed.size} fixtures with key: ${cacheKey}`
+        );
 
       this.fixtureCache.set(cacheKey, transformed);
       return transformed;
@@ -296,6 +305,7 @@ class FixtureOptimizationService {
     const cached = this.leagueCache.get(cacheKey);
 
     if (cached) {
+      // Log when returning popular leagues from cache instead of API
       console.log("📦 Returning cached popular leagues");
       return cached;
     }
@@ -456,6 +466,7 @@ class FixtureOptimizationService {
     }
 
     try {
+      // Log when fetching fresh homepage data instead of using cache
       console.log("🏠 Fetching fresh homepage data...");
 
       // Get date ranges
@@ -498,7 +509,8 @@ class FixtureOptimizationService {
         allFixtures = this.getAllFixturesArrayFromMap(cachedFixtures);
         usedCache = true;
       } else {
-        console.log("🔍 No suitable cached fixtures found, making API call...");
+        // Log when no cached fixtures are found and API call is needed
+      console.log("🔍 No suitable cached fixtures found, making API call...");
 
         // Make a single API call for all fixtures we need (20 days, all leagues)
         const fixturesMap = await this.getOptimizedFixtures().catch(
@@ -592,6 +604,7 @@ class FixtureOptimizationService {
   selectTopPicks(fixtures, limit = 10) {
     if (!fixtures || fixtures.length === 0) return [];
 
+    // Log when starting to select top picks from fixtures with count and limit
     console.log(`🎯 selectTopPicks called with ${fixtures.length} fixtures, limit: ${limit}`);
 
     // First filter out matches that have already started
@@ -601,6 +614,7 @@ class FixtureOptimizationService {
       return matchTime > now; // Only include matches that haven't started yet
     });
 
+    // Log the number of fixtures after filtering out already started matches
     console.log(`🔮 Filtered to ${upcomingFixtures.length} upcoming fixtures (excluded already started matches)`);
 
     if (upcomingFixtures.length === 0) {
@@ -708,6 +722,7 @@ class FixtureOptimizationService {
     });
 
     console.log(`📊 Scored fixtures: ${scoredFixtures.length}`);
+    // Log the top 3 scoring fixtures for debugging selection algorithm
     console.log(`🏆 Top 3 scores: ${scoredFixtures.slice(0, 3).map(f => f.topPickScore).join(', ')}`);
 
     // Sort by score first, then by start time for matches with similar scores
@@ -722,6 +737,7 @@ class FixtureOptimizationService {
       })
       .slice(0, limit);
 
+    // Log the final number of top picks being returned
     console.log(`✅ Returning ${sortedFixtures.length} top picks`);
     return sortedFixtures.map(({ topPickScore, ...fixture }) => fixture); // Remove score from final result
   }
@@ -743,6 +759,7 @@ class FixtureOptimizationService {
       return matchTime > now && matchTime <= threeDaysFromNow; // Only matches in next 3 days
     });
 
+    // Log the number of matches found in the next 3 days for football daily
     console.log(`📅 Found ${next3DaysFixtures.length} matches in next 3 days`);
 
     if (next3DaysFixtures.length === 0) {
@@ -1247,10 +1264,12 @@ class FixtureOptimizationService {
       await this.getOptimizedFixtures();
       
       // Optionally, preload homepage data
+      // Log when starting to preload homepage data for caching
       console.log("[CacheRefresh] Preloading homepage data...");
       await this.getHomepageData();
       
-      console.log("[CacheRefresh] All data refreshed and cached.");
+      // Log successful completion of cache refresh operation
+    console.log("[CacheRefresh] All data refreshed and cached.");
     } catch (err) {
       console.error("[CacheRefresh] Error refreshing all data:", err);
       
@@ -1293,7 +1312,9 @@ class FixtureOptimizationService {
 
   // Helper to get all fixtures as an array from the Map
   getAllFixturesArrayFromMap(fixturesMap) {
+    // Log when converting Map to Array for fixture processing
     console.log(`🔍 getAllFixturesArrayFromMap called`);
+    // Log the input type when converting Map to Array
     console.log(
       `📊 Input type: ${
         fixturesMap instanceof Map
@@ -1310,6 +1331,7 @@ class FixtureOptimizationService {
     }
     if (fixturesMap instanceof Map) {
       const result = Array.from(fixturesMap.values());
+      // Log successful conversion from Map to Array with fixture count
       console.log(`✅ Converted Map to Array: ${result.length} fixtures`);
       return result;
     }
