@@ -35,17 +35,7 @@ export default class BaseBetOutcomeCalculationService {
     this.marketsWithWinningCalculations = [
       1, 10, 14, 18, 19, 33, 38, 39, 41, 44, 50, 51,
     ];
-
-
-   
-  }
-
-
-  
-  
-  getMarketType(marketId) {
-    const numericMarketId = parseInt(marketId);
-    const extendedMarketTypes = {
+    this.extendedMarketTypes = {
       DOUBLE_CHANCE: [2], // Double Chance
       OVER_UNDER: [4, 5, 80, 81], // Match Goals, Alternative Match Goals, Goals Over/Under
       ASIAN_HANDICAP: [6], // Asian Handicap
@@ -78,7 +68,17 @@ export default class BaseBetOutcomeCalculationService {
       HALF_TIME_RESULT_TOTAL_GOALS: [123], // Half Time Result / Total Goals
       CORNERS: [60, 67, 68, 69], // Corner markets - 2-Way Corners, Corners, Total Corners, Alternative Corners
     };
-    for (const [type, ids] of Object.entries(extendedMarketTypes)) {
+
+   
+  }
+
+
+  
+  
+  getMarketType(marketId) {
+    const numericMarketId = parseInt(marketId);
+  
+    for (const [type, ids] of Object.entries(this.extendedMarketTypes)) {
       if (ids.includes(numericMarketId)) {
         return type;
       }
