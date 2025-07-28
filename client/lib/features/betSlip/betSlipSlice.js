@@ -398,7 +398,15 @@ export const placeBetThunk = createAsyncThunk(
       dispatch(clearAllBets());
       return results;
     } catch (error) {
-      console.error("Error placing bet:", error);
+      // Check if this is a client error (4xx status) before logging as error
+      if (error.response?.status >= 400 && error.response?.status < 500) {
+        // Log client errors as info, not error
+        console.log("Client error (like conflicting bet):", error.response?.data);
+      } else {
+        // Log server errors as errors
+        console.error("Error placing bet:", error);
+      }
+      
       return rejectWithValue(
         error.response?.data || {
           success: false,

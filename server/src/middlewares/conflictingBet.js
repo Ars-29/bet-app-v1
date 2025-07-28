@@ -57,14 +57,17 @@ export const preventConflictingBet = async (req, res, next) => {
       
       console.log('[conflictingBet] Checking for conflicts with:', { matchId, marketId });
 
-      // Check for conflicts with single bets
+      // Check for conflicts with single bets (non-combination bets)
       const existingSingleBet = await Bet.findOne({
         userId,
         matchId,
         'betDetails.market_id': marketId,
         status: 'pending',
         // Ensure it's not a combination bet
-        combination: { $exists: false }
+        $or: [
+          { combination: { $exists: false } },
+          { combination: { $size: 0 } }
+        ]
       });
 
       if (existingSingleBet) {
@@ -80,8 +83,12 @@ export const preventConflictingBet = async (req, res, next) => {
         userId,
         status: 'pending',
         combination: { $exists: true, $ne: [] },
-        'combination.matchId': matchId,
-        'combination.betDetails.market_id': marketId
+        'combination': {
+          $elemMatch: {
+            matchId: matchId,
+            'betDetails.market_id': marketId
+          }
+        }
       });
 
       if (existingCombinationBet) {

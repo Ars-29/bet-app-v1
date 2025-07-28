@@ -45,10 +45,16 @@ export default function RootLayout({ children }) {
           </AuthProvider>
         </ReduxProvider>
         <Toaster
-          position="bottom-right"
+          position="top-center"
           richColors
-          closeButton
+          closeButton={false}
           expand={false}
+          toastOptions={{
+            duration: 5000,
+            style: {
+              borderRadius: '0px',
+            },
+          }}
         />
       </body>
     </html>
