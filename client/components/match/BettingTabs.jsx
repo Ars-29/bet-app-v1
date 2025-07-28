@@ -1379,7 +1379,11 @@ const PlayerCardOption = ({ player, matchData }) => {
                                 team1: matchData.participants[0].name,
                                 team2: matchData.participants[1].name,
                                 time: matchData.starting_at,
-                            }, option.label, option.value, 'player-cards', option.id)}
+                            }, option.label, option.value, 'player-cards', option.id, {
+                                marketId: option.marketId,
+                                name: player.name,
+                                marketDescription: option.market_description || 'Player Cards'
+                            })}
                         >
                             <div className="relative w-full flex flex-col justify-between z-10">
                                 <div className="flex justify-between items-center">
@@ -1415,7 +1419,11 @@ const PlayerCardOption = ({ player, matchData }) => {
                                 team1: matchData.participants[0].name,
                                 team2: matchData.participants[1].name,
                                 time: matchData.starting_at,
-                            }, option.label, option.value, 'player', option.id)}
+                            }, option.label, option.value, 'player', option.id, {
+                                marketId: option.marketId,
+                                name: player.name,
+                                marketDescription: option.market_description || 'Player Markets'
+                            })}
                         >
                             <div className="relative w-full flex flex-col min-[600px]:flex-row min-[600px]:justify-between min-[600px]:items-center py-1 z-10 gap-0 min-[600px]:gap-1">
                                 <div className="text-[10px] min-[400px]:text-[12px] text-white font-medium transition-colors duration-200 leading-tight flex-1 text-left break-words min-[600px]:truncate">

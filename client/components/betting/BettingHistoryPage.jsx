@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar, Filter, Download, Loader2, ArrowUpDown, TrendingUp, TrendingDown } from 'lucide-react';
+import { Calendar, Filter, Download, Loader2, ArrowUpDown, TrendingUp, TrendingDown, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   fetchUserBets,
   selectBets,
@@ -29,6 +29,7 @@ const BettingHistoryPage = ({ userId }) => {
   // Keep filters for date range, but not bet type
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', status: '' });
   const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
+  const [expandedCombinations, setExpandedCombinations] = useState(new Set());
 
   useEffect(() => {
     if (userId && user && user.role === 'admin') {
@@ -48,6 +49,18 @@ const BettingHistoryPage = ({ userId }) => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+  };
+
+  const toggleCombinationExpansion = (betId) => {
+    setExpandedCombinations(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(betId)) {
+        newSet.delete(betId);
+      } else {
+        newSet.add(betId);
+      }
+      return newSet;
+    });
   };
 
   const formatAmount = (amount) => {
@@ -73,7 +86,141 @@ const BettingHistoryPage = ({ userId }) => {
     };
   };
 
+  // Helper function to check if bet is a combination bet
+  const isCombinationBet = (bet) => {
+    return bet.combination && Array.isArray(bet.combination) && bet.combination.length > 0;
+  };
 
+  // Helper function to get bet type badge
+  const getBetTypeBadge = (bet) => {
+    if (isCombinationBet(bet)) {
+      return (
+        <Badge variant="outline" className="text-purple-600 bg-purple-50 border-purple-200 text-xs">
+          Combo ({bet.combination.length})
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-blue-600 bg-blue-50 border-blue-200 text-xs">
+        Single
+      </Badge>
+    );
+  };
+
+  // Helper function to render combination bet details
+  const renderCombinationDetails = (bet) => {
+    if (!isCombinationBet(bet)) return null;
+
+    return (
+      <TableRow className="bg-gray-50">
+        <TableCell colSpan={11} className="p-0">
+          <div className="p-4 border-l-4 border-purple-400 bg-purple-25">
+            <div className="mb-3">
+              <h4 className="font-semibold text-gray-700 text-sm">Combination Bet Legs</h4>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-100 text-[12px]">
+                  <TableHead className="w-16">Leg</TableHead>
+                  <TableHead className="w-20">Stake</TableHead>
+                  <TableHead className="w-16">Odds</TableHead>
+                  <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-32">Type</TableHead>
+                  <TableHead>Match</TableHead>
+                  <TableHead>Market</TableHead>
+                  <TableHead>Selection</TableHead>
+                  <TableHead className="w-20">Value</TableHead>
+                  <TableHead className="w-20">Profit</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bet.combination.map((leg, index) => {
+                  const calculateLegProfit = () => {
+                    if (leg.status.toLowerCase() === 'won') {
+                      return ((bet.stake * leg.odds) - bet.stake).toFixed(2);
+                    } else if (leg.status.toLowerCase() === 'lost') {
+                      return bet.stake.toFixed(2);
+                    }
+                    return 0;
+                  };
+
+                  return (
+                    <TableRow key={index} className="text-[12px] hover:bg-gray-100">
+                      <TableCell className="font-medium text-purple-600">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600">${bet.stake.toFixed(2)}</span>
+                      </TableCell>
+                      <TableCell>{leg.odds}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            leg.status.toLowerCase() === 'won' 
+                              ? 'text-emerald-600 bg-emerald-50 border-emerald-200 text-xs'
+                              : leg.status.toLowerCase() === 'lost'
+                              ? 'text-rose-600 bg-rose-50 border-rose-200 text-xs'
+                              : 'text-amber-600 bg-amber-50 border-amber-200 text-xs'
+                          }
+                        >
+                          {leg.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-purple-600 bg-purple-50 border-purple-200 text-xs">
+                          Combo
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-32">
+                        <div className="truncate" title={leg.teams}>
+                          {leg.teams || "-"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-32">
+                        <div className="truncate" title={leg.betDetails?.market_description}>
+                          {leg.betDetails?.market_description || "-"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-32">
+                        <div className="truncate" title={leg.selection}>
+                          {leg.betDetails?.market_id === "37" 
+                            ? `${leg.betDetails?.label} ${leg.betDetails?.total} / ${leg.betDetails?.name}`
+                            : (leg.selection || "-")
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-20">
+                        <div className="truncate" title={leg.betDetails?.total}>
+                          {leg.betDetails?.market_id === "37" 
+                            ? leg.betDetails?.total
+                            : (leg.betDetails?.total || "-")
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {leg.status.toLowerCase() === "won" ? (
+                          <span className="font-medium text-green-600 text-xs">
+                            +${calculateLegProfit()}
+                          </span>
+                        ) : leg.status.toLowerCase() === "pending" ? (
+                          <span className="text-gray-500 text-xs">Pending</span>
+                        ) : (
+                          <span className="font-medium text-red-600 text-xs">
+                            -${calculateLegProfit()}
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   // Filter bets by date range and status if set
   const filteredBets = React.useMemo(() => {
@@ -98,23 +245,27 @@ const BettingHistoryPage = ({ userId }) => {
         const bVal = Math.abs(b.stake);
         return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
       }
+      if (sortConfig.key === 'odds') {
+        const aVal = a.odds || 0;
+        const bVal = b.odds || 0;
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      if (sortConfig.key === 'payout') {
+        const aVal = a.payout || 0;
+        const bVal = b.payout || 0;
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
       if (sortConfig.key === 'createdAt') {
         const aVal = new Date(a.createdAt);
         const bVal = new Date(b.createdAt);
         return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
       }
-      if (sortConfig.key === 'odds') {
-        const aVal = parseFloat(a.odds) || 0;
-        const bVal = parseFloat(b.odds) || 0;
-        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      if (sortConfig.key === 'status') {
+        const aVal = a.status || '';
+        const bVal = b.status || '';
+        return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
-      const aVal = a[sortConfig.key]?.toString().toLowerCase() || '';
-      const bVal = b[sortConfig.key]?.toString().toLowerCase() || '';
-      if (sortConfig.direction === 'asc') {
-        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-      } else {
-        return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
-      }
+      return 0;
     });
   }, [filteredBets, sortConfig]);
 
@@ -225,6 +376,7 @@ const BettingHistoryPage = ({ userId }) => {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50 text-[13px]">
+                      <TableHead className="w-8"></TableHead>
                       <TableHead
                         className="cursor-pointer select-none"
                         onClick={() => handleSort('stake')}
@@ -261,6 +413,7 @@ const BettingHistoryPage = ({ userId }) => {
                           <ArrowUpDown className="h-4 w-4" />
                         </div>
                       </TableHead>
+                      <TableHead className="select-none">Type</TableHead>
                       <TableHead className="select-none">Match</TableHead>
                       <TableHead className="select-none">Market</TableHead>
                       <TableHead className="select-none">Selection</TableHead>
@@ -279,71 +432,91 @@ const BettingHistoryPage = ({ userId }) => {
                   <TableBody>
                     {sortedData.map((item) => {
                       const { date, time } = formatDateTime(item.createdAt);
+                      const isExpanded = expandedCombinations.has(item._id);
+                      const isCombo = isCombinationBet(item);
+                      
                       return (
-                        <TableRow key={item._id} className="hover:bg-gray-50 text-[13px]">
-                          <TableCell>{formatAmount(item.stake)}</TableCell>
-                          <TableCell>{item.odds}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div>{date}</div>
-                              <div className="text-gray-500">{time}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                item.status.toLowerCase() === 'won' 
-                                  ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
-                                  : item.status.toLowerCase() === 'lost'
-                                  ? 'text-rose-600 bg-rose-50 border-rose-200'
-                                  : 'text-amber-600 bg-amber-50 border-amber-200'
-                              }
-                            >
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="max-w-48">
-                            <div className="truncate" title={item.teams}>
-                              {item.teams || "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-48">
-                            <div className="truncate" title={item.betDetails?.market_description}>
-                              {item.betDetails?.market_description || "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-48">
-                            <div className="truncate" title={item.selection}>
-                              {item.betDetails?.market_id === "37" 
-                                ? `${item.betDetails?.label} ${item.betDetails?.total} / ${item.betDetails?.name}`
-                                : (item.selection || "-")
-                              }
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-32">
-                            <div className="truncate" title={item.betDetails?.total}>
-                              {item.betDetails?.market_id === "37" 
-                                ? item.betDetails?.total
-                                : (item.betDetails?.total || "-")
-                              }
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {item.status.toLowerCase() === "won" ? (
-                              <span className="font-medium text-green-600">
-                                +$
-                                {((item.stake * item.odds)).toFixed(2)}
-                              </span>
-                            ) : item.status.toLowerCase() === "pending" ? (
-                              <span className="text-gray-500">Pending</span>
-                            ) : (
-                              <span className="font-medium text-red-600">
-                                -${item.stake.toFixed(2)}
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
+                        <React.Fragment key={item._id}>
+                          <TableRow
+                            className={`hover:bg-gray-50 text-[13px] ${isCombo ? 'cursor-pointer' : ''}`}
+                            onClick={isCombo ? () => toggleCombinationExpansion(item._id) : undefined}
+                          >
+                            <TableCell>
+                              {isCombo && (
+                                isExpanded ? <ChevronDown className="h-4 w-4 text-purple-600" /> : <ChevronRight className="h-4 w-4 text-purple-600" />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {formatAmount(item.stake)}
+                            </TableCell>
+                            <TableCell>{item.odds}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div>{date}</div>
+                                <div className="text-gray-500">{time}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  item.status.toLowerCase() === 'won' 
+                                    ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                                    : item.status.toLowerCase() === 'lost'
+                                    ? 'text-rose-600 bg-rose-50 border-rose-200'
+                                    : 'text-amber-600 bg-amber-50 border-amber-200'
+                                }
+                              >
+                                {item.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {getBetTypeBadge(item)}
+                            </TableCell>
+                            <TableCell className="max-w-48">
+                              <div className="truncate" title={isCombo ? `Combination Bet (${item.combination.length} legs)` : item.teams}>
+                                {isCombo ? `Combination (${item.combination.length} legs)` : (item.teams || "-")}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-48">
+                              <div className="truncate" title={isCombo ? "Multiple Markets" : item.betDetails?.market_description}>
+                                {isCombo ? "Multiple Markets" : (item.betDetails?.market_description || "-")}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-48">
+                              <div className="truncate" title={isCombo ? "Multiple Selections" : item.selection}>
+                                {isCombo ? "Multiple Selections" : (
+                                  item.betDetails?.market_id === "37" 
+                                    ? `${item.betDetails?.label} ${item.betDetails?.total} / ${item.betDetails?.name}`
+                                    : (item.selection || "-")
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-32">
+                              <div className="truncate" title={isCombo ? "N/A" : item.betDetails?.total}>
+                                {isCombo ? "N/A" : (
+                                  item.betDetails?.market_id === "37" 
+                                    ? item.betDetails?.total
+                                    : (item.betDetails?.total || "-")
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {item.status.toLowerCase() === "won" ? (
+                                <span className="font-medium text-green-600">
+                                  +${((item.stake * item.odds) - item.stake).toFixed(2)}
+                                </span>
+                              ) : item.status.toLowerCase() === "pending" ? (
+                                <span className="text-gray-500">Pending</span>
+                              ) : (
+                                <span className="font-medium text-red-600">
+                                  -${item.stake.toFixed(2)}
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && isCombo && renderCombinationDetails(item)}
+                        </React.Fragment>
                       );
                     })}
                   </TableBody>

@@ -30,6 +30,7 @@ import {
   Trophy,
   ThumbsDown,
   TrendingDown,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,6 +92,8 @@ export default function BetManagement() {
   const [selectedUser, setSelectedUser] = useState("all");
   const [amountRange, setAmountRange] = useState({ min: "", max: "" });
   const [activeFilters, setActiveFilters] = useState(0);
+  const [expandedCombinations, setExpandedCombinations] = useState(new Set());
+  const [betTypeFilter, setBetTypeFilter] = useState("all");
 
   useEffect(() => {
     dispatch(fetchAdminBets());
@@ -106,6 +109,11 @@ export default function BetManagement() {
     }
   }, [betsByUser]);
 
+  // Helper function to check if bet is a combination bet
+  const isCombinationBet = (bet) => {
+    return bet.combination && Array.isArray(bet.combination) && bet.combination.length > 0;
+  };
+
   // Filtering
   const filteredBets = useMemo(() => {
     return allBets.filter((bet) => {
@@ -114,6 +122,12 @@ export default function BetManagement() {
         return false;
       // User
       if (selectedUser !== "all" && bet.user !== selectedUser) return false;
+      // Bet Type
+      if (betTypeFilter !== "all") {
+        const isCombo = isCombinationBet(bet);
+        if (betTypeFilter === "combo" && !isCombo) return false;
+        if (betTypeFilter === "single" && isCombo) return false;
+      }
       // Date
       if (dateRange.from || dateRange.to) {
         const betDate = new Date(bet.createdAt);
@@ -141,7 +155,7 @@ export default function BetManagement() {
       }
       return true;
     });
-  }, [allBets, filter, selectedUser, dateRange, amountRange, searchQuery]);
+  }, [allBets, filter, selectedUser, betTypeFilter, dateRange, amountRange, searchQuery]);
 
   // Sorting
   const sortedBets = useMemo(() => {
@@ -212,10 +226,154 @@ export default function BetManagement() {
     return <span className="font-medium">${amount.toFixed(2)}</span>;
   };
 
+  // Helper function to get bet type badge
+  const getBetTypeBadge = (bet) => {
+    if (isCombinationBet(bet)) {
+      return (
+        <Badge variant="outline" className="text-purple-600 bg-purple-50 border-purple-200 text-xs">
+          Combo ({bet.combination.length})
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-blue-600 bg-blue-50 border-blue-200 text-xs">
+        Single
+      </Badge>
+    );
+  };
+
+  const toggleCombinationExpansion = (betId) => {
+    setExpandedCombinations(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(betId)) {
+        newSet.delete(betId);
+      } else {
+        newSet.add(betId);
+      }
+      return newSet;
+    });
+  };
+
+  // Helper function to render combination bet details
+  const renderCombinationDetails = (bet) => {
+    if (!isCombinationBet(bet)) return null;
+
+    return (
+      <TableRow className="bg-gray-50">
+        <TableCell colSpan={11} className="p-0">
+          <div className="p-4 border-l-4 border-purple-400 bg-purple-25">
+            <div className="mb-3">
+              <h4 className="font-semibold text-gray-700 text-sm">Combination Bet Legs</h4>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-100 text-[12px]">
+                  <TableHead className="w-16">Leg</TableHead>
+                  <TableHead className="w-20">Stake</TableHead>
+                  <TableHead className="w-16">Odds</TableHead>
+                  <TableHead className="w-24">Status</TableHead>
+                  <TableHead className="w-32">Type</TableHead>
+                  <TableHead>Match</TableHead>
+                  <TableHead>Market</TableHead>
+                  <TableHead>Selection</TableHead>
+                  <TableHead className="w-20">Value</TableHead>
+                  <TableHead className="w-20">Profit</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bet.combination.map((leg, index) => {
+                  const calculateLegProfit = () => {
+                    if (leg.status.toLowerCase() === 'won') {
+                      return ((bet.stake * leg.odds) - bet.stake).toFixed(2);
+                    } else if (leg.status.toLowerCase() === 'lost') {
+                      return bet.stake.toFixed(2);
+                    }
+                    return 0;
+                  };
+
+                  return (
+                    <TableRow key={index} className="text-[12px] hover:bg-gray-100">
+                      <TableCell className="font-medium text-purple-600">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600">${bet.stake.toFixed(2)}</span>
+                      </TableCell>
+                      <TableCell>{leg.odds}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            leg.status.toLowerCase() === 'won' 
+                              ? 'text-emerald-600 bg-emerald-50 border-emerald-200 text-xs'
+                              : leg.status.toLowerCase() === 'lost'
+                              ? 'text-rose-600 bg-rose-50 border-rose-200 text-xs'
+                              : 'text-amber-600 bg-amber-50 border-amber-200 text-xs'
+                          }
+                        >
+                          {leg.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-purple-600 bg-purple-50 border-purple-200 text-xs">
+                          Combo
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-32">
+                        <div className="truncate" title={leg.teams}>
+                          {leg.teams || "-"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-32">
+                        <div className="truncate" title={leg.betDetails?.market_description}>
+                          {leg.betDetails?.market_description || "-"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-32">
+                        <div className="truncate" title={leg.selection}>
+                          {leg.betDetails?.market_id === "37" 
+                            ? `${leg.betDetails?.label} ${leg.betDetails?.total} / ${leg.betDetails?.name}`
+                            : (leg.selection || "-")
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-20">
+                        <div className="truncate" title={leg.betDetails?.total}>
+                          {leg.betDetails?.market_id === "37" 
+                            ? leg.betDetails?.total
+                            : (leg.betDetails?.total || "-")
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {leg.status.toLowerCase() === "won" ? (
+                          <span className="font-medium text-green-600 text-xs">
+                            +${calculateLegProfit()}
+                          </span>
+                        ) : leg.status.toLowerCase() === "pending" ? (
+                          <span className="text-gray-500 text-xs">Pending</span>
+                        ) : (
+                          <span className="font-medium text-red-600 text-xs">
+                            -${calculateLegProfit()}
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   const resetFilters = () => {
     setDateRange({ from: null, to: null });
     setSelectedUser("all");
     setAmountRange({ min: "", max: "" });
+    setBetTypeFilter("all");
     setActiveFilters(0);
   };
 
@@ -225,6 +383,7 @@ export default function BetManagement() {
     if (selectedUser !== "all") count++;
     if (amountRange.min || amountRange.max) count++;
     if (filter !== "all") count++;
+    if (betTypeFilter !== "all") count++;
     setActiveFilters(count);
     setFilterDrawerOpen(false);
   };
@@ -395,7 +554,74 @@ export default function BetManagement() {
                           </Select>
                         </div>
 
-                        {/* Then add a border-t before the next filter section */}
+                        {/* Bet Type Filter */}
+                        <div className="space-y-3 pt-2 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
+                              <Ticket className="h-4 w-4 text-gray-500" />
+                              Bet Type
+                            </label>
+                            {betTypeFilter !== "all" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                                onClick={() => setBetTypeFilter("all")}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Clear
+                              </Button>
+                            )}
+                          </div>
+
+                          <Select value={betTypeFilter} onValueChange={setBetTypeFilter}>
+                            <SelectTrigger
+                              className={`w-full h-10 px-3 hover:bg-transparent cursor-pointer rounded-none ${
+                                betTypeFilter !== "all"
+                                  ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50"
+                                  : ""
+                              }`}
+                            >
+                              <SelectValue placeholder="Select bet type" />
+                            </SelectTrigger>
+                            <SelectContent className="border border-gray-200 shadow-lg rounded-lg">
+                              <SelectItem value="all" className="py-2 px-3">
+                                All Types
+                                <span className="ml-2 text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+                                  {allBets.length}
+                                </span>
+                              </SelectItem>
+                              <SelectItem
+                                value="single"
+                                className="py-2 px-3 text-blue-600"
+                              >
+                                Single Bets
+                                <span className="ml-2 text-xs bg-blue-50 px-2 py-0.5 rounded-full text-blue-600">
+                                  {
+                                    allBets.filter(
+                                      (bet) => !isCombinationBet(bet)
+                                    ).length
+                                  }
+                                </span>
+                              </SelectItem>
+                              <SelectItem
+                                value="combo"
+                                className="py-2 px-3 text-purple-600"
+                              >
+                                Combination Bets
+                                <span className="ml-2 text-xs bg-purple-50 px-2 py-0.5 rounded-full text-purple-600">
+                                  {
+                                    allBets.filter(
+                                      (bet) => isCombinationBet(bet)
+                                    ).length
+                                  }
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Date Range Filter */}
                         <div className="space-y-3 pt-2 border-t border-gray-100">
                           <div className="flex items-center justify-between">
                             <label className="text-sm font-medium flex items-center gap-2 text-gray-700">
@@ -699,6 +925,33 @@ export default function BetManagement() {
                     if (dateRange.from || dateRange.to) count++;
                     if (selectedUser !== "all") count++;
                     if (amountRange.min || amountRange.max) count++;
+                    if (betTypeFilter !== "all") count++;
+                    setActiveFilters(count);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+
+            {betTypeFilter !== "all" && (
+              <Badge
+                variant="secondary"
+                className="flex items-center gap-1 py-1 px-3"
+              >
+                <span>
+                  Type: {betTypeFilter === "combo" ? "Combination" : "Single"}
+                </span>
+                <button
+                  className="ml-1 cursor-pointer"
+                  onClick={() => {
+                    setBetTypeFilter("all");
+                    // Recalculate active filters
+                    let count = 0;
+                    if (filter !== "all") count++;
+                    if (dateRange.from || dateRange.to) count++;
+                    if (selectedUser !== "all") count++;
+                    if (amountRange.min || amountRange.max) count++;
                     setActiveFilters(count);
                   }}
                 >
@@ -724,6 +977,7 @@ export default function BetManagement() {
                     if (newDateRange.from || newDateRange.to) count++;
                     if (selectedUser !== "all") count++;
                     if (amountRange.min || amountRange.max) count++;
+                    if (betTypeFilter !== "all") count++;
                     setActiveFilters(count);
                   }}
                 >
@@ -749,6 +1003,7 @@ export default function BetManagement() {
                     if (newDateRange.from || newDateRange.to) count++;
                     if (selectedUser !== "all") count++;
                     if (amountRange.min || amountRange.max) count++;
+                    if (betTypeFilter !== "all") count++;
                     setActiveFilters(count);
                   }}
                 >
@@ -772,6 +1027,7 @@ export default function BetManagement() {
                     if (filter !== "all") count++;
                     if (dateRange.from || dateRange.to) count++;
                     if (amountRange.min || amountRange.max) count++;
+                    if (betTypeFilter !== "all") count++;
                     setActiveFilters(count);
                   }}
                 >
@@ -797,6 +1053,7 @@ export default function BetManagement() {
                     if (filter !== "all") count++;
                     if (dateRange.from || dateRange.to) count++;
                     if (selectedUser !== "all") count++;
+                    if (betTypeFilter !== "all") count++;
                     setActiveFilters(count);
                   }}
                 >
@@ -915,6 +1172,7 @@ export default function BetManagement() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50 text-[13px]">
+                    <TableHead className="w-8"></TableHead>
                     <TableHead
                       className="cursor-pointer select-none"
                       onClick={() => handleSort("user")}
@@ -960,6 +1218,7 @@ export default function BetManagement() {
                         <ArrowUpDown className="h-4 w-4" />
                       </div>
                     </TableHead>
+                    <TableHead className="select-none">Type</TableHead>
                     <TableHead className="select-none">Match</TableHead>
                     <TableHead className="select-none">Market</TableHead>
                     <TableHead className="select-none">Selection</TableHead>
@@ -979,7 +1238,7 @@ export default function BetManagement() {
                   {paginatedBets.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={10}
+                        colSpan={12}
                         className="text-center py-12 text-gray-500"
                       >
                         <div className="flex flex-col items-center justify-center">
@@ -994,69 +1253,84 @@ export default function BetManagement() {
                   ) : (
                     paginatedBets.map((bet) => {
                       const { date, time } = formatDateTime(bet.createdAt);
+                      const isExpanded = expandedCombinations.has(bet._id);
+                      const isCombo = isCombinationBet(bet);
+                      
                       return (
-                        <TableRow
-                          key={bet._id}
-                          className="hover:bg-gray-50 text-[13px]"
-                        >
-                          <TableCell>{bet.user}</TableCell>
-                          <TableCell>{formatAmount(bet.stake)}</TableCell>
-                          <TableCell>{bet.odds}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div>{date}</div>
-                              <div className="text-gray-500">{time}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getStatusColor(bet.status)}
-                            >
-                              {bet.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="max-w-48">
-                            <div className="truncate" title={bet.teams}>
-                              {bet.teams || "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-48">
-                            <div className="truncate" title={bet.betDetails?.market_description}>
-                              {bet.betDetails?.market_description || "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-48">
-                            <div className="truncate" title={bet.selection}>
-                              {bet.betDetails?.market_id === "37" 
-                                ? `${bet.betDetails?.label} ${bet.betDetails?.total} / ${bet.betDetails?.name}`
-                                : (bet.selection || "-")
-                              }
-                            </div>
-                          </TableCell>
-                          <TableCell className="max-w-32">
-                            <div className="truncate" title={bet.betDetails?.total}>
-                              {bet.betDetails?.market_id === "37" 
-                                ? bet.betDetails?.total
-                                : (bet.betDetails?.total || "-")
-                              }
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {bet.status.toLowerCase() === "won" ? (
-                              <span className="font-medium text-green-600">
-                                +$
-                                {((bet.stake * bet.odds) ).toFixed(2)}
-                              </span>
-                            ) : bet.status.toLowerCase() === "pending" ? (
-                              <span className="text-gray-500">Pending</span>
-                            ) : (
-                              <span className="font-medium text-red-600">
-                                -${bet.stake.toFixed(2)}
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
+                        <React.Fragment key={bet._id}>
+                          <TableRow
+                            className={`hover:bg-gray-50 text-[13px] ${isCombo ? 'cursor-pointer' : ''}`}
+                            onClick={isCombo ? () => toggleCombinationExpansion(bet._id) : undefined}
+                          >
+                            <TableCell>
+                              {isCombo && (
+                                isExpanded ? <ChevronDown className="h-4 w-4 text-purple-600" /> : <ChevronRight className="h-4 w-4 text-purple-600" />
+                              )}
+                            </TableCell>
+                            <TableCell>{bet.user}</TableCell>
+                            <TableCell>{formatAmount(bet.stake)}</TableCell>
+                            <TableCell>{bet.odds}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div>{date}</div>
+                                <div className="text-gray-500">{time}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={getStatusColor(bet.status)}
+                              >
+                                {bet.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {getBetTypeBadge(bet)}
+                            </TableCell>
+                            <TableCell className="max-w-48">
+                              <div className="truncate" title={isCombo ? `Combination Bet (${bet.combination.length} legs)` : bet.teams}>
+                                {isCombo ? `Combination (${bet.combination.length} legs)` : (bet.teams || "-")}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-48">
+                              <div className="truncate" title={isCombo ? "Multiple Markets" : bet.betDetails?.market_description}>
+                                {isCombo ? "Multiple Markets" : (bet.betDetails?.market_description || "-")}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-48">
+                              <div className="truncate" title={isCombo ? "Multiple Selections" : bet.selection}>
+                                {isCombo ? "Multiple Selections" : (
+                                  bet.betDetails?.market_id === "37" 
+                                    ? `${bet.betDetails?.label} ${bet.betDetails?.total} / ${bet.betDetails?.name}`
+                                    : (bet.selection || "-")
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-32">
+                              <div className="truncate" title={isCombo ? "N/A" : bet.betDetails?.total}>
+                                {isCombo ? "N/A" : (
+                                  bet.betDetails?.market_id === "37" 
+                                    ? bet.betDetails?.total
+                                    : (bet.betDetails?.total || "-")
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {bet.status.toLowerCase() === "won" ? (
+                                <span className="font-medium text-green-600">
+                                  +${((bet.stake * bet.odds) - bet.stake).toFixed(2)}
+                                </span>
+                              ) : bet.status.toLowerCase() === "pending" ? (
+                                <span className="text-gray-500">Pending</span>
+                              ) : (
+                                <span className="font-medium text-red-600">
+                                  -${bet.stake.toFixed(2)}
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && isCombo && renderCombinationDetails(bet)}
+                        </React.Fragment>
                       );
                     })
                   )}
