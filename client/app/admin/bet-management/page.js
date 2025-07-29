@@ -83,8 +83,8 @@ export default function BetManagement() {
   const [uniqueUsers, setUniqueUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState("all");
-  const [sortColumn, setSortColumn] = useState("_id");
-  const [sortDirection, setSortDirection] = useState("asc");
+  const [sortColumn, setSortColumn] = useState("createdAt");
+  const [sortDirection, setSortDirection] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
