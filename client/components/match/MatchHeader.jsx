@@ -87,7 +87,7 @@ const MatchHeader = ({ matchData }) => {
                         <div
                             className="flex items-center cursor-pointer hover:bg-gray-50 py-2 px-3 rounded-2xl transition-colors"
                             onClick={toggleDropdown}
-                            ref={triggetRef}
+                            ref={triggetRef}    
                         >
                             <div className="flex items-center space-x-3">
                                 <Avatar>

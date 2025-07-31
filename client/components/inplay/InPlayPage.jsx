@@ -16,10 +16,10 @@ const InPlayPage = () => {
     useEffect(() => {
         // Initial fetch (with loading state)
         dispatch(fetchLiveMatches());
-        // Set up polling every 2 minutes (silent updates)
+        // Set up polling every 30 seconds (silent updates) for more accurate timing
         const interval = setInterval(() => {
             dispatch(silentUpdateLiveMatches());
-        }, 120000); // 2 minutes
+        }, 30000); // 30 seconds instead of 2 minutes
         return () => clearInterval(interval);
     }, [dispatch]);
 

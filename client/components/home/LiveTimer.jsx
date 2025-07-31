@@ -1,9 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { calculateServerTimeOffset, getCorrectedCurrentTime, parseSportsMonksTime } from '@/lib/utils';
 
 const LiveTimer = ({ startingAt, timing }) => {
     const [elapsedTime, setElapsedTime] = useState('');
+    const [serverTimeOffset, setServerTimeOffset] = useState(0);
+
+    // Calculate server time offset to handle timezone differences
+    useEffect(() => {
+        const offset = calculateServerTimeOffset(timing);
+        setServerTimeOffset(offset);
+    }, [timing]);
 
     useEffect(() => {
         // Prefer the new timing structure from backend over legacy startingAt calculation
@@ -13,7 +21,7 @@ const LiveTimer = ({ startingAt, timing }) => {
             const calculateElapsedTimeFromTiming = () => {
                 try {
                     // Use the precise timing info from backend
-                    const { currentMinute, currentSecond, period, matchStarted } = timing;
+                    const { currentMinute, currentSecond, period, matchStarted, cacheTime } = timing;
                     
                     // If we have precise minute/second info from backend, use it
                     if (currentMinute !== undefined && currentSecond !== undefined) {
@@ -35,10 +43,10 @@ const LiveTimer = ({ startingAt, timing }) => {
                         return;
                     }
                     
-                    // Fallback to calculating from matchStarted timestamp
+                    // Fallback to calculating from matchStarted timestamp with server offset correction
                     const startTimeMs = matchStarted * 1000; // Convert Unix timestamp to milliseconds
-                    const now = Date.now();
-                    const diffMs = now - startTimeMs;
+                    const correctedNow = getCorrectedCurrentTime(serverTimeOffset);
+                    const diffMs = correctedNow.getTime() - startTimeMs;
                     
                     // If match hasn't started yet or negative diff
                     if (diffMs < 0) {
@@ -95,26 +103,19 @@ const LiveTimer = ({ startingAt, timing }) => {
 
         const calculateElapsedTime = () => {
             try {
-                // Handle UTC timestamp properly
-                let startTime;
-                if (typeof startingAt === 'string') {
-                    // If the string doesn't have timezone info, treat it as UTC
-                    if (!startingAt.includes('T') && !startingAt.includes('Z') && !startingAt.includes('+')) {
-                        // Format: "2025-07-16 09:00:00" -> treat as UTC
-                        startTime = new Date(startingAt + ' UTC');
-                    } else {
-                        // Already has timezone info
-                        startTime = new Date(startingAt);
-                    }
-                } else {
-                    startTime = new Date(startingAt);
+                // Use the improved time parsing utility
+                const startTime = parseSportsMonksTime(startingAt);
+                if (!startTime) {
+                    setElapsedTime('--');
+                    return;
                 }
 
-                const now = new Date();
-                const diffMs = now.getTime() - startTime.getTime();
+                const correctedNow = getCorrectedCurrentTime(serverTimeOffset);
+                const diffMs = correctedNow.getTime() - startTime.getTime();
 
                 console.log('[LiveTimer] Start time (UTC):', startTime.toISOString());
-                console.log('[LiveTimer] Current time:', now.toISOString());
+                console.log('[LiveTimer] Current time (corrected):', correctedNow.toISOString());
+                console.log('[LiveTimer] Server offset:', serverTimeOffset, 'ms');
                 console.log('[LiveTimer] Difference (ms):', diffMs);
 
                 // If match hasn't started yet
@@ -160,7 +161,7 @@ const LiveTimer = ({ startingAt, timing }) => {
             console.log('[LiveTimer] Cleaning up legacy interval');
             clearInterval(interval);
         };
-    }, [startingAt, timing]);
+    }, [startingAt, timing, serverTimeOffset]);
 
     if (!elapsedTime) {
         return <span className="text-xs text-gray-600">--</span>;

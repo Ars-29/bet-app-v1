@@ -304,6 +304,22 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
              options.some(opt => opt.label.toLowerCase().includes('over')) && 
              options.some(opt => opt.label.toLowerCase().includes('under')));
         
+        // Special handling for Match Goals market (market_id: 4)
+        const isMatchGoalsMarket = 
+            section.title?.toLowerCase().includes('match goals') ||
+            section.type === '4' ||
+            (options.length === 2 && 
+             options.some(opt => opt.label.toLowerCase().includes('over')) && 
+             options.some(opt => opt.label.toLowerCase().includes('under')) &&
+             options.some(opt => opt.total));
+        
+        // Special handling for Alternative Match Goals market (market_id: 5)
+        const isAlternativeMatchGoalsMarket = 
+            section.title?.toLowerCase().includes('alternative match goals') ||
+            section.type === '5' ||
+            (section.title?.toLowerCase().includes('alternative') && 
+             section.title?.toLowerCase().includes('match goals'));
+        
         // Special handling for goal scorer markets
         const isGoalScorerMarket = 
             section.title?.toLowerCase().includes('team to score') || 
@@ -352,6 +368,16 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
         // Special rendering for Total Goals markets (Over/Under partition)
         if (isTotalGoalsMarket) {
             return renderTotalGoalsOptions(options, section);
+        }
+        
+        // Special rendering for Match Goals market (market_id: 4)
+        if (isMatchGoalsMarket) {
+            return renderMatchGoalsOptions(options, section);
+        }
+        
+        // Special rendering for Alternative Match Goals market (market_id: 5)
+        if (isAlternativeMatchGoalsMarket) {
+            return renderMatchGoalsOptions(options, section);
         }
         
         // Special handling for correct score markets
@@ -852,6 +878,46 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
             </div>
         );
     };
+
+    // Special rendering function for Match Goals market (market_id: 4)
+    const renderMatchGoalsOptions = (options, section) => {
+        // Get the total value from the first option that has it
+        const totalValue = options.find(opt => opt.total)?.total || '0';
+        
+        return (
+            <div className="grid grid-cols-2 gap-1">
+                {options.map((option, idx) => {
+                    // Create the label with the total value
+                    const labelWithTotal = `${option.label} ${totalValue}`;
+                    
+                    return (
+                        <BettingOptionButton
+                            key={`match-goals-${option.label}-${idx}`}
+                            label={labelWithTotal}
+                            value={option.value}
+                            sectionType={section?.type || 'market'}
+                            optionId={option?.id}
+                            matchData={matchData}
+                            isResultOption={false}
+                            isHandicapOption={false}
+                            isHalfTimeOption={false}
+                            isOverUnderOption={true}
+                            isGoalScorerOption={false}
+                            handicapValue={option.handicap}
+                            halfIndicator={option.halfIndicator}
+                            thresholds={option.thresholds}
+                            total={option.total}
+                            name={option.name}
+                            marketDescription={section.title}
+                            suspended={option.suspended}
+                            marketId={option.marketId}
+                        />
+                    );
+                })}
+            </div>
+        );
+    };
+
     // Render market sections
     const renderSections = (category) => {
         // Detect if this is a player-based market (Player Shots, Player Shots on Target, Goalscorer, etc.)

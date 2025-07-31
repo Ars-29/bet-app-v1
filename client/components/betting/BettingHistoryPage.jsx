@@ -130,7 +130,6 @@ const BettingHistoryPage = ({ userId }) => {
                   <TableHead>Market</TableHead>
                   <TableHead>Selection</TableHead>
                   <TableHead className="w-20">Value</TableHead>
-                  <TableHead className="w-20">Profit</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -197,19 +196,6 @@ const BettingHistoryPage = ({ userId }) => {
                             : (leg.betDetails?.total || "-")
                           }
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {leg.status.toLowerCase() === "won" ? (
-                          <span className="font-medium text-green-600 text-xs">
-                            +${calculateLegProfit()}
-                          </span>
-                        ) : leg.status.toLowerCase() === "pending" ? (
-                          <span className="text-gray-500 text-xs">Pending</span>
-                        ) : (
-                          <span className="font-medium text-red-600 text-xs">
-                            -${calculateLegProfit()}
-                          </span>
-                        )}
                       </TableCell>
                     </TableRow>
                   );

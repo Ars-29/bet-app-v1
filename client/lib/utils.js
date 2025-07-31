@@ -6,35 +6,81 @@ export function cn(...inputs) {
 }
 
 /**
- * Timezone utility functions for consistent 12-hour format date/time handling
- * Ensures all times are displayed in the user's local timezone in 12-hour format
- * Handles SportsMonks API format: "YYYY-MM-DD HH:MM:SS" (UTC)
+ * Parse SportsMonks time with improved timezone handling
+ * @param {string} dateTime - Date time string from SportsMonks API
+ * @returns {Date|null} Parsed date or null if invalid
  */
-
-/**
- * Parse SportsMonks API time format and convert to proper Date object
- * @param {string} dateTime - Time from SportsMonks API (e.g., "2022-08-01 14:35:00")
- * @returns {Date} Date object in UTC
- */
-const parseSportsMonksTime = (dateTime) => {
+export const parseSportsMonksTime = (dateTime) => {
   if (!dateTime) return null;
   
-  // Handle different formats
-  if (typeof dateTime === 'string') {
-    // SportsMonks format: "2022-08-01 14:35:00" (UTC)
-    if (dateTime.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
-      // Convert to ISO format by adding 'T' and 'Z'
-      const isoString = dateTime.replace(' ', 'T') + 'Z';
-      return new Date(isoString);
+  try {
+    let parsedDate;
+    
+    if (typeof dateTime === 'string') {
+      // Handle different formats
+      if (dateTime.includes('T')) {
+        // ISO format with timezone
+        parsedDate = new Date(dateTime);
+      } else if (dateTime.includes('Z') || dateTime.includes('+')) {
+        // Already has timezone info
+        parsedDate = new Date(dateTime);
+      } else {
+        // Format: "2025-07-16 09:00:00" -> treat as UTC
+        parsedDate = new Date(dateTime + ' UTC');
+      }
+    } else if (dateTime instanceof Date) {
+      parsedDate = dateTime;
+    } else {
+      return null;
     }
-    // ISO format: "2022-08-01T14:35:00Z" or "2022-08-01T14:35:00.000Z"
-    else if (dateTime.includes('T')) {
-      return new Date(dateTime);
+    
+    // Validate the date
+    if (isNaN(parsedDate.getTime())) {
+      console.error(`[parseSportsMonksTime] Invalid date created from: ${dateTime}`);
+      return null;
     }
+    
+    return parsedDate;
+  } catch (error) {
+    console.error(`[parseSportsMonksTime] Error parsing date: ${dateTime}`, error);
+    return null;
+  }
+};
+
+/**
+ * Calculate server time offset for better synchronization
+ * @param {Object} timing - Timing object from backend
+ * @returns {number} Time offset in milliseconds
+ */
+export const calculateServerTimeOffset = (timing) => {
+  if (!timing || !timing.cacheTime) {
+    return 0;
   }
   
-  // Fallback to regular Date constructor
-  return new Date(dateTime);
+  const serverCacheTime = timing.cacheTime;
+  const clientTime = Date.now();
+  const offset = clientTime - serverCacheTime;
+  
+  // Log for debugging
+  console.log('[calculateServerTimeOffset]', {
+    serverCacheTime: new Date(serverCacheTime).toISOString(),
+    clientTime: new Date(clientTime).toISOString(),
+    offset: offset,
+    offsetSeconds: Math.round(offset / 1000)
+  });
+  
+  return offset;
+};
+
+/**
+ * Get corrected current time using server offset
+ * @param {number} serverOffset - Server time offset in milliseconds
+ * @returns {Date} Corrected current time
+ */
+export const getCorrectedCurrentTime = (serverOffset = 0) => {
+  const now = new Date();
+  const correctedTime = new Date(now.getTime() - serverOffset);
+  return correctedTime;
 };
 
 /**

@@ -64,10 +64,10 @@ const MatchDetailPage = ({ matchId }) => {
         // Initial fetch (with loading state)
         dispatch(fetchLiveOdds(matchId));
 
-        // Set up polling every 1 second (silent updates)
+        // Set up polling every 30 seconds (silent updates) for more accurate timing
         const interval = setInterval(() => {
             dispatch(silentUpdateLiveOdds(matchId));
-        }, 3000); // 1 second
+        }, 30000); // 30 seconds instead of 3 seconds to reduce API calls but maintain accuracy
 
         return () => clearInterval(interval);
     }, [matchId, matchData, dispatch]);

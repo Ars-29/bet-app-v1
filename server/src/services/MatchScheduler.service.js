@@ -17,14 +17,30 @@ class MatchSchedulerService {
   }
 
   /**
-   * Initialize the scheduler by processing today's matches
+   * Initialize the scheduler with jobs
    */
   async initializeScheduler() {
     try {
-      console.log('[MatchScheduler] Initializing match scheduler...');
+      console.log('[MatchScheduler] Initializing scheduler...');
+
+      // Define jobs
+      agenda.define('checkMatchStart', async (job) => {
+        const { matchIds, expectedStartTime, checkCount } = job.attrs.data;
+        await this.checkMatchesStarted(matchIds, expectedStartTime, checkCount);
+      });
+
+      agenda.define('updateLiveMatchTiming', async (job) => {
+        await this.updateLiveMatchTiming();
+      });
+
+      // Schedule recurring timing updates every 30 seconds for live matches
+      agenda.every('30 seconds', 'updateLiveMatchTiming');
+
+      // Initialize with today's matches
       await this.processTodaysMatches();
       await this.scheduleDelayedMatchCheck();
-      console.log('[MatchScheduler] Scheduler initialized successfully');
+
+      console.log('[MatchScheduler] Scheduler initialized with jobs and today\'s matches');
     } catch (error) {
       console.error('[MatchScheduler] Error initializing scheduler:', error);
     }
@@ -255,6 +271,67 @@ class MatchSchedulerService {
   }
 
   /**
+   * Update timing data for live matches more frequently
+   */
+  async updateLiveMatchTiming() {
+    try {
+      const liveMatchIds = this.liveMatchesCache.keys();
+      
+      if (liveMatchIds.length === 0) {
+        return;
+      }
+
+      console.log(`[MatchScheduler] Updating timing for ${liveMatchIds.length} live matches`);
+
+      // Call the livescores API to get fresh timing data
+      const response = await sportsMonksService.client.get('/football/livescores/inplay', {
+        params: {
+          include: 'periods'
+        }
+      });
+
+      const liveMatches = response.data?.data || [];
+      const liveMatchesMap = new Map(liveMatches.map(m => [m.id, m]));
+
+      let updatedCount = 0;
+      for (const matchId of liveMatchIds) {
+        const liveMatch = liveMatchesMap.get(matchId);
+        if (liveMatch) {
+          const currentMatch = this.liveMatchesCache.get(matchId);
+          if (currentMatch) {
+            // Update timing information
+            const currentPeriod = liveMatch.periods?.find(p => p.ticking);
+            const now = Date.now();
+            
+            const updatedTiming = {
+              ...currentMatch.timing,
+              currentMinute: currentPeriod?.minutes || currentMatch.timing.currentMinute,
+              currentSecond: currentPeriod?.seconds || currentMatch.timing.currentSecond,
+              period: currentPeriod?.description || currentMatch.timing.period,
+              lastUpdate: now,
+              isTicking: currentPeriod?.ticking || false,
+              totalElapsedSeconds: currentPeriod ? (currentPeriod.minutes * 60 + currentPeriod.seconds) : currentMatch.timing.totalElapsedSeconds
+            };
+
+            // Update the cached match with fresh timing
+            this.liveMatchesCache.set(matchId, {
+              ...currentMatch,
+              timing: updatedTiming
+            });
+
+            updatedCount++;
+          }
+        }
+      }
+
+      console.log(`[MatchScheduler] Updated timing for ${updatedCount}/${liveMatchIds.length} live matches`);
+      
+    } catch (error) {
+      console.error('[MatchScheduler] Error updating live match timing:', error);
+    }
+  }
+
+  /**
    * Process a match that has started
    */
   async processStartedMatch(liveMatch) {
@@ -267,15 +344,25 @@ class MatchSchedulerService {
         return;
       }
 
-      // Extract timing information from periods
+      // Extract timing information from periods with improved precision
       const currentPeriod = liveMatch.periods?.find(p => p.ticking);
+      const firstPeriod = liveMatch.periods?.[0];
+      
+      // Calculate more precise timing information
+      const now = Date.now();
       const timingInfo = {
-        matchStarted: liveMatch.periods?.[0]?.started || Date.now() / 1000, // Unix timestamp from API
+        matchStarted: firstPeriod?.started || now / 1000, // Unix timestamp from API
         currentMinute: currentPeriod?.minutes || 0,
         currentSecond: currentPeriod?.seconds || 0,
         period: currentPeriod?.description || '1st-half',
-        cacheTime: Date.now(), // Our cache timestamp in milliseconds
-        cacheTimeUTC: new Date().toISOString() // UTC string for debugging
+        cacheTime: now, // Our cache timestamp in milliseconds
+        cacheTimeUTC: new Date().toISOString(), // UTC string for debugging
+        serverTime: now, // Current server time for synchronization
+        lastUpdate: now, // When this timing data was last updated
+        // Additional timing metadata for better accuracy
+        periodStartTime: currentPeriod?.started || firstPeriod?.started || now / 1000,
+        isTicking: currentPeriod?.ticking || false,
+        totalElapsedSeconds: currentPeriod ? (currentPeriod.minutes * 60 + currentPeriod.seconds) : 0
       };
 
       // Cache the live match with timing info
@@ -291,7 +378,12 @@ class MatchSchedulerService {
       // Fetch and cache odds for this match
       await this.fetchAndCacheMatchOdds(liveMatch.id);
       
-      console.log(`[MatchScheduler] Processed started match ${liveMatch.id} - ${liveMatch.name}`);
+      console.log(`[MatchScheduler] Processed started match ${liveMatch.id} - ${liveMatch.name} with timing:`, {
+        currentMinute: timingInfo.currentMinute,
+        currentSecond: timingInfo.currentSecond,
+        period: timingInfo.period,
+        cacheTime: new Date(timingInfo.cacheTime).toISOString()
+      });
       
     } catch (error) {
       console.error(`[MatchScheduler] Error processing started match ${liveMatch.id}:`, error);
