@@ -45,6 +45,7 @@ const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
                     .then(response => response.json())
                     .then(data => {
                         if (data.data && data.data.betting_data) {
+                            console.log(`🔄 Live odds updated for match ${match.id}:`, data.data.betting_data);
                             setLiveOdds(prev => ({ 
                                 ...prev, 
                                 [match.id]: data.data.betting_data 
@@ -59,6 +60,48 @@ const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
         
         return () => clearInterval(interval);
     }, [league.matches, isInPlay]);
+
+    // Helper function to extract main odds (1X2) from live odds data
+    const extractMainOddsFromLiveData = (liveOddsData) => {
+        if (!liveOddsData || !Array.isArray(liveOddsData)) {
+            return {};
+        }
+
+        const mainOdds = {};
+        
+        // Find the main result market (1X2)
+        const resultMarket = liveOddsData.find(odd => 
+            odd.market_name === 'Full Time Result' || 
+            odd.market_name === 'Match Result' ||
+            odd.market_name === '1X2'
+        );
+        
+        if (resultMarket && resultMarket.odds) {
+            resultMarket.odds.forEach(odd => {
+                if (odd.label === 'Home' || odd.label === '1') {
+                    mainOdds['1'] = {
+                        value: odd.odds,
+                        oddId: odd.id,
+                        suspended: odd.suspended || false
+                    };
+                } else if (odd.label === 'Draw' || odd.label === 'X') {
+                    mainOdds['X'] = {
+                        value: odd.odds,
+                        oddId: odd.id,
+                        suspended: odd.suspended || false
+                    };
+                } else if (odd.label === 'Away' || odd.label === '2') {
+                    mainOdds['2'] = {
+                        value: odd.odds,
+                        oddId: odd.id,
+                        suspended: odd.suspended || false
+                    };
+                }
+            });
+        }
+        
+        return mainOdds;
+    };
 
     const isOddClickable = (odd) => {
         if (!buttonsReady) return false;
@@ -152,45 +195,63 @@ const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
                                     </div>
                                     <div className="flex items-center flex-shrink-0">
                                         <div className="flex gap-1">
-                                            {match.odds['1'] && (
-                                                <Button
-                                                    size="sm"
-                                                    className={getOddButtonClass(match.odds['1'])}
-                                                    onClick={isOddClickable(match.odds['1']) 
-                                                        ? createBetHandler(match, 'Home', match.odds['1'].value, '1x2', match.odds['1'].oddId, { marketId: "1", label: "Home", name: `Win - ${match.team1 || match.participants?.[0]?.name || 'Team 1'}`, marketDescription: "Full Time Result" })
-                                                        : undefined
-                                                    }
-                                                    disabled={!isOddClickable(match.odds['1'])}
-                                                >
-                                                    {match.odds['1'].value}
-                                                </Button>
-                                            )}
-                                            {match.odds['X'] && (
-                                                <Button
-                                                    size="sm"
-                                                    className={getOddButtonClass(match.odds['X'])}
-                                                    onClick={isOddClickable(match.odds['X']) 
-                                                        ? createBetHandler(match, 'Draw', match.odds['X'].value, '1x2', match.odds['X'].oddId, { marketId: "1", label: "Draw", name: `Draw - ${match.team1 || match.participants?.[0]?.name || 'Team 1'} vs ${match.team2 || match.participants?.[1]?.name || 'Team 2'}`, marketDescription: "Full Time Result" })
-                                                        : undefined
-                                                    }
-                                                    disabled={!isOddClickable(match.odds['X'])}
-                                                >
-                                                    {match.odds['X'].value}
-                                                </Button>
-                                            )}
-                                            {match.odds['2'] && (
-                                                <Button
-                                                    size="sm"
-                                                    className={getOddButtonClass(match.odds['2'])}
-                                                    onClick={isOddClickable(match.odds['2']) 
-                                                        ? createBetHandler(match, 'Away', match.odds['2'].value, '1x2', match.odds['2'].oddId, { marketId: "1", label: "Away", name: `Win - ${match.team2 || match.participants?.[1]?.name || 'Team 2'}`, marketDescription: "Full Time Result" })
-                                                        : undefined
-                                                    }
-                                                    disabled={!isOddClickable(match.odds['2'])}
-                                                >
-                                                    {match.odds['2'].value}
-                                                </Button>
-                                            )}
+                                            {(() => {
+                                                // Use live odds if available, otherwise fall back to match odds
+                                                const displayOdds = (isInPlay && match.isLive && liveOdds[match.id]) 
+                                                    ? extractMainOddsFromLiveData(liveOdds[match.id])
+                                                    : match.odds;
+                                                
+                                                const isUsingLiveOdds = isInPlay && match.isLive && liveOdds[match.id];
+                                                
+                                                return (
+                                                    <>
+                                                        {displayOdds['1'] && (
+                                                            <Button
+                                                                size="sm"
+                                                                className={getOddButtonClass(displayOdds['1'])}
+                                                                onClick={isOddClickable(displayOdds['1']) 
+                                                                    ? createBetHandler(match, 'Home', displayOdds['1'].value, '1x2', displayOdds['1'].oddId, { marketId: "1", label: "Home", name: `Win - ${match.team1 || match.participants?.[0]?.name || 'Team 1'}`, marketDescription: "Full Time Result" })
+                                                                    : undefined
+                                                                }
+                                                                disabled={!isOddClickable(displayOdds['1'])}
+                                                            >
+                                                                {displayOdds['1'].value}
+                                                            </Button>
+                                                        )}
+                                                        {displayOdds['X'] && (
+                                                            <Button
+                                                                size="sm"
+                                                                className={getOddButtonClass(displayOdds['X'])}
+                                                                onClick={isOddClickable(displayOdds['X']) 
+                                                                    ? createBetHandler(match, 'Draw', displayOdds['X'].value, '1x2', displayOdds['X'].oddId, { marketId: "1", label: "Draw", name: `Draw - ${match.team1 || match.participants?.[0]?.name || 'Team 1'} vs ${match.team2 || match.participants?.[1]?.name || 'Team 2'}`, marketDescription: "Full Time Result" })
+                                                                    : undefined
+                                                                }
+                                                                disabled={!isOddClickable(displayOdds['X'])}
+                                                            >
+                                                                {displayOdds['X'].value}
+                                                            </Button>
+                                                        )}
+                                                        {displayOdds['2'] && (
+                                                            <Button
+                                                                size="sm"
+                                                                className={getOddButtonClass(displayOdds['2'])}
+                                                                onClick={isOddClickable(displayOdds['2']) 
+                                                                    ? createBetHandler(match, 'Away', displayOdds['2'].value, '1x2', displayOdds['2'].oddId, { marketId: "1", label: "Away", name: `Win - ${match.team2 || match.participants?.[1]?.name || 'Team 2'}`, marketDescription: "Full Time Result" })
+                                                                    : undefined
+                                                                }
+                                                                disabled={!isOddClickable(displayOdds['2'])}
+                                                            >
+                                                                {displayOdds['2'].value}
+                                                            </Button>
+                                                        )}
+                                                        {isUsingLiveOdds && (
+                                                            <div className="text-xs text-green-500 ml-1">
+                                                                🔄
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 </div>

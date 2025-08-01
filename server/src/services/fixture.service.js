@@ -33,10 +33,11 @@ class FixtureOptimizationService {
   async getOptimizedFixtures() {
     const today = new Date();
     // Fetch matches from today to next 7 days
-    const startDate = today.toISOString().split("T")[0]; // Today's date
-    const endDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const utcDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60 * 1000));
+    const startDate = utcDate.toISOString().split("T")[0]; // UTC date
+    const endDate = new Date(utcDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .split("T")[0]; // UTC date + 7 days
     const cacheKey = `fixtures_today_to_7days_${startDate}_${endDate}`;
 
     // Log when searching for fixtures in cache with specific key
@@ -121,6 +122,16 @@ class FixtureOptimizationService {
         const data = response.data?.data || [];
         // Log the number of fixtures returned for each page during API pagination
         console.log(`📊 Page ${page} returned ${data.length} fixtures`);
+        
+        // Debug: Check for Flamengo matches in API response
+        const flamengoMatches = data.filter(f => f.name && f.name.includes('Flamengo'));
+        if (flamengoMatches.length > 0) {
+          console.log(`🔍 Found ${flamengoMatches.length} Flamengo matches in API response page ${page}:`);
+          flamengoMatches.forEach(match => {
+            console.log(`🔍 - ${match.name} at ${match.starting_at}`);
+          });
+        }
+        
         allFixtures = allFixtures.concat(data);
         const pagination = response.data?.pagination;
         if (pagination && pagination.has_more && pagination.next_page) {
@@ -136,6 +147,15 @@ class FixtureOptimizationService {
       const transformedArr = this.transformFixturesData(allFixtures);
       // Log the number of fixtures after transformation and filtering
       console.log(`🔄 Transformed fixtures: ${transformedArr.length}`);
+      
+      // Debug: Check for Flamengo matches after transformation
+      const flamengoMatchesAfterTransform = transformedArr.filter(f => f.name && f.name.includes('Flamengo'));
+      if (flamengoMatchesAfterTransform.length > 0) {
+        console.log(`🔄 Found ${flamengoMatchesAfterTransform.length} Flamengo matches after transformation:`);
+        flamengoMatchesAfterTransform.forEach(match => {
+          console.log(`🔄 - ${match.name} at ${match.starting_at}`);
+        });
+      }
 
       const transformed = new Map();
       for (const fixture of transformedArr) {
@@ -392,10 +412,11 @@ class FixtureOptimizationService {
 
     // Filter to only show upcoming matches (from today onwards) - show all cached matches
     const today = new Date();
-    fixtures = fixtures.filter((fixture) => {
-      const fixtureDate = new Date(fixture.starting_at);
-      return fixtureDate >= today; // Show all upcoming matches from today onwards
-    });
+    fixtures = fixtures
+    // .filter((fixture) => {
+    //   const fixtureDate = new Date(fixture.starting_at);
+    //   return fixtureDate >= today; // Show all upcoming matches from today onwards
+    // });
 
     console.log(`📊 Upcoming fixtures after date filter: ${fixtures.length}`);
 
@@ -478,20 +499,22 @@ class FixtureOptimizationService {
     const cacheKey = "homepage_data";
     const cached = this.fixtureCache.get(cacheKey);
 
+    // Force clear cache for debugging timezone issues
     if (cached) {
-      console.log("📦 Returning cached homepage data");
-      return cached;
+      console.log("🔄 Clearing homepage cache to force fresh data with UTC timezone fixes");
+      this.fixtureCache.del(cacheKey);
     }
 
     try {
       // Log when fetching fresh homepage data instead of using cache
       console.log("🏠 Fetching fresh homepage data...");
 
-      // Get date ranges
+      // Get date ranges using UTC to ensure consistency
       const today = new Date();
-      const todayStr = today.toISOString().split("T")[0];
+      const utcToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+      const todayStr = utcToday.toISOString().split("T")[0];
       const footballDailyEndDate = new Date(
-        today.getTime() + 20 * 24 * 60 * 60 * 1000
+        utcToday.getTime() + 20 * 24 * 60 * 60 * 1000
       );
       const footballDailyEndStr = footballDailyEndDate
         .toISOString()
@@ -537,15 +560,34 @@ class FixtureOptimizationService {
         allFixtures = this.getAllFixturesArrayFromMap(fixturesMap);
       }
 
-      // Now filter the fixtures for homepage needs
-      const today10Days = new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000);
+      // Now filter the fixtures for homepage needs using UTC
+      const today10Days = new Date(utcToday.getTime() + 10 * 24 * 60 * 60 * 1000);
       const topPicksEndStr = today10Days.toISOString().split("T")[0];
 
-      // Filter fixtures for top picks (first 10 days)
+      // Filter fixtures for top picks (first 10 days) using UTC comparison
       let topPicksFixtures = allFixtures.filter((fixture) => {
         const fixtureDate = new Date(fixture.starting_at);
-        return fixtureDate <= today10Days;
+        // Convert fixture date to UTC for comparison
+        const fixtureUTC = new Date(Date.UTC(
+          fixtureDate.getUTCFullYear(), 
+          fixtureDate.getUTCMonth(), 
+          fixtureDate.getUTCDate()
+        ));
+        
+        // Debug: Log Flamengo matches during filtering
+        if (fixture.name && fixture.name.includes('Flamengo')) {
+          console.log(`🏠 Homepage filtering - Flamengo match: ${fixture.name}`);
+          console.log(`🏠 Fixture date: ${fixtureDate.toISOString()}`);
+          console.log(`🏠 Fixture UTC: ${fixtureUTC.toISOString()}`);
+          console.log(`🏠 Today + 10 days: ${today10Days.toISOString()}`);
+          console.log(`🏠 Is within 10 days: ${fixtureUTC <= today10Days}`);
+        }
+        
+        return fixtureUTC <= today10Days;
       });
+      
+      console.log(`🏠 Top picks fixtures after filtering: ${topPicksFixtures.length}`);
+      console.log(`🏠 All fixtures count: ${allFixtures.length}`);
 
       // All fixtures are already suitable for football daily (20 days)
       let footballDailyFixtures = allFixtures;
@@ -626,18 +668,84 @@ class FixtureOptimizationService {
     console.log(
       `🎯 selectTopPicks called with ${fixtures.length} fixtures, limit: ${limit}`
     );
-
-    // First filter out matches that have already started
+    
+    // Debug: Log current time in different timezones
     const now = new Date();
+    console.log(`🌍 Current local time: ${now.toISOString()}`);
+    console.log(`🌍 Current UTC time: ${now.toUTCString()}`);
+    console.log(`🌍 Pakistan time (UTC+5): ${new Date(now.getTime() + 5 * 60 * 60 * 1000).toISOString()}`);
+
+    // First filter out matches that have already started (using local timezone)
+    const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes()));
+    console.log(`🌍 UTC Now for comparison: ${utcNow.toISOString()}`);
+    
     const upcomingFixtures = fixtures.filter((fixture) => {
       const matchTime = new Date(fixture.starting_at);
-      return matchTime > now; // Only include matches that haven't started yet
+      
+      // FIX: Let's try a different approach - treat API time as UTC and convert to local
+      const localNow = new Date();
+      
+      // Get the server's timezone offset in minutes
+      const serverTimezoneOffset = localNow.getTimezoneOffset();
+      console.log(`🌍 Server timezone offset: ${serverTimezoneOffset} minutes`);
+      
+      // Try treating the API time as UTC and converting to local time
+      // This should work if the API is actually providing UTC times
+      const localMatchTime = new Date(matchTime.getTime() - (serverTimezoneOffset * 60 * 1000));
+      
+      // Debug: Log specific matches being filtered
+      if (fixture.name && fixture.name.includes('Flamengo')) {
+        console.log(`🔍 Flamengo match: ${fixture.name}`);
+        console.log(`🔍 Original match time: ${matchTime.toISOString()}`);
+        console.log(`🔍 Server timezone offset: ${serverTimezoneOffset} minutes`);
+        console.log(`🔍 Local match time: ${localMatchTime.toISOString()}`);
+        console.log(`🔍 Local now: ${localNow.toISOString()}`);
+        console.log(`🔍 Is upcoming (local): ${localMatchTime > localNow}`);
+        console.log(`🔍 Time difference (minutes): ${(localMatchTime.getTime() - localNow.getTime()) / (1000 * 60)}`);
+        
+        // Also show the raw starting_at value
+        console.log(`🔍 Raw starting_at from API: ${fixture.starting_at}`);
+        
+        // Manual calculation for debugging
+        const manualUTC = new Date('2025-07-31T19:30:00.000Z');
+        const manualLocal = new Date(manualUTC.getTime() - (serverTimezoneOffset * 60 * 1000));
+        console.log(`🔍 Manual UTC: ${manualUTC.toISOString()}`);
+        console.log(`🔍 Manual Local: ${manualLocal.toISOString()}`);
+        console.log(`🔍 Expected: 2025-08-01T00:30:00.000Z (5:30 AM Pakistan time)`);
+      }
+      
+      return localMatchTime > localNow; // Only include matches that haven't started yet
     });
 
     // Log the number of fixtures after filtering out already started matches
     console.log(
       `🔮 Filtered to ${upcomingFixtures.length} upcoming fixtures (excluded already started matches)`
     );
+    
+    // Debug: Show matches starting in the next 6 hours
+    const localNow = new Date();
+    const next6Hours = new Date(localNow.getTime() + 6 * 60 * 60 * 1000);
+    const soonMatches = upcomingFixtures.filter(fixture => {
+      const matchTime = new Date(fixture.starting_at);
+      // Get the server's timezone offset in minutes
+      const serverTimezoneOffset = localNow.getTimezoneOffset();
+      // Try treating the API time as UTC and converting to local time
+      const localMatchTime = new Date(matchTime.getTime() - (serverTimezoneOffset * 60 * 1000));
+      return localMatchTime <= next6Hours;
+    });
+    
+    if (soonMatches.length > 0) {
+      console.log(`⏰ Matches starting in next 6 hours (${soonMatches.length}):`);
+      soonMatches.slice(0, 5).forEach(match => {
+        const matchTime = new Date(match.starting_at);
+        // Get the server's timezone offset in minutes
+        const serverTimezoneOffset = localNow.getTimezoneOffset();
+        // Try treating the API time as UTC and converting to local time
+        const localMatchTime = new Date(matchTime.getTime() - (serverTimezoneOffset * 60 * 1000));
+        const diffMinutes = (localMatchTime.getTime() - localNow.getTime()) / (1000 * 60);
+        console.log(`⏰ - ${match.name} at ${match.starting_at} (in ${Math.round(diffMinutes)} minutes)`);
+      });
+    }
 
     if (upcomingFixtures.length === 0) {
       console.log("⚠️ No upcoming fixtures available for top picks");
@@ -647,9 +755,21 @@ class FixtureOptimizationService {
     // Score fixtures based on multiple criteria
     const scoredFixtures = upcomingFixtures.map((fixture) => {
       let score = 10; // Give all matches a base score to ensure some matches are selected
+      
+      // Debug: Log Flamengo matches during scoring
+      if (fixture.name && fixture.name.includes('Flamengo')) {
+        console.log(`🏆 Scoring Flamengo match: ${fixture.name}`);
+        console.log(`🏆 Initial score: ${score}`);
+      }
 
       // Prefer matches with better odds variety (much broader range)
       if (fixture.odds && fixture.odds.length > 0) {
+        // Debug: Log odds for Flamengo matches
+        if (fixture.name && fixture.name.includes('Flamengo')) {
+          console.log(`🏆 Flamengo odds count: ${fixture.odds.length}`);
+          console.log(`🏆 Flamengo odds:`, fixture.odds.slice(0, 3).map(o => `${o.name}: ${o.value}`));
+        }
+        
         const homeOdd =
           fixture.odds.find((o) => {
             const label = o.label?.toLowerCase();
@@ -779,6 +899,11 @@ class FixtureOptimizationService {
       // Attach league data from cache
       const league = this.getLeagueById(fixture.league_id);
 
+      // Debug: Log final score for Flamengo matches
+      if (fixture.name && fixture.name.includes('Flamengo')) {
+        console.log(`🏆 Final score for ${fixture.name}: ${score}`);
+      }
+      
       return { ...fixture, topPickScore: score, league };
     });
 
@@ -805,22 +930,62 @@ class FixtureOptimizationService {
 
     // Log the final number of top picks being returned
     console.log(`✅ Returning ${sortedFixtures.length} top picks`);
+    
+    // Debug: Log which matches are actually selected
+    console.log(`🏆 Selected top picks:`);
+    sortedFixtures.forEach((fixture, index) => {
+      console.log(`🏆 ${index + 1}. ${fixture.name} (score: ${fixture.topPickScore})`);
+    });
+    
     return sortedFixtures.map(({ topPickScore, ...fixture }) => fixture); // Remove score from final result
   }
 
   // Helper method to generate football daily data grouped by leagues
   generateFootballDaily(fixtures, topLeagues, includeAllLeagues = false) {
+    console.log(`📅 generateFootballDaily called with ${fixtures.length} fixtures`);
+    
+    // Debug: Log Flamengo matches in input fixtures
+    const flamengoMatches = fixtures.filter(f => f.name && f.name.includes('Flamengo'));
+    if (flamengoMatches.length > 0) {
+      console.log(`📅 Found ${flamengoMatches.length} Flamengo matches in input fixtures:`);
+      flamengoMatches.forEach(match => {
+        console.log(`📅 - ${match.name} at ${match.starting_at}`);
+      });
+    }
+    
     if (!fixtures || fixtures.length === 0) {
       return [];
     }
 
-    // Filter for next 3 days only (today, tomorrow, day after tomorrow)
+    // Filter for next 3 days only (today, tomorrow, day after tomorrow) using UTC
     const now = new Date();
-    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes()));
+    const threeDaysFromNow = new Date(utcNow.getTime() + 3 * 24 * 60 * 60 * 1000);
 
     const next3DaysFixtures = fixtures.filter((fixture) => {
       const matchTime = new Date(fixture.starting_at);
-      return matchTime > now && matchTime <= threeDaysFromNow; // Only matches in next 3 days
+      
+      // FIX: Let's try a different approach - treat API time as UTC and convert to local
+      const localNow = new Date();
+      
+      // Get the server's timezone offset in minutes
+      const serverTimezoneOffset = localNow.getTimezoneOffset();
+      
+      // Try treating the API time as UTC and converting to local time
+      const localMatchTime = new Date(matchTime.getTime() - (serverTimezoneOffset * 60 * 1000));
+      const localThreeDaysFromNow = new Date(localNow.getTime() + 3 * 24 * 60 * 60 * 1000);
+      
+      // Debug: Log Flamengo matches during football daily filtering
+      if (fixture.name && fixture.name.includes('Flamengo')) {
+        console.log(`📅 Football Daily filtering - Flamengo match: ${fixture.name}`);
+        console.log(`📅 Original match time: ${matchTime.toISOString()}`);
+        console.log(`📅 Local match time: ${localMatchTime.toISOString()}`);
+        console.log(`📅 Local now: ${localNow.toISOString()}`);
+        console.log(`📅 Local 3 days from now: ${localThreeDaysFromNow.toISOString()}`);
+        console.log(`📅 Is in next 3 days: ${localMatchTime > localNow && localMatchTime <= localThreeDaysFromNow}`);
+      }
+      
+      return localMatchTime > localNow && localMatchTime <= localThreeDaysFromNow; // Only matches in next 3 days
     });
 
     // Log the number of matches found in the next 3 days for football daily
