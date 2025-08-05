@@ -147,7 +147,22 @@ export const getPopularLeagues = asyncHandler(async (req, res) => {
 export const getHomepageFixtures = asyncHandler(async (req, res) => {
   const { fixtureOptimizationService } = getServices();
   
-  const homepageData = await fixtureOptimizationService.getHomepageData();
+  // Check cache first
+  const cacheKey = "homepage_data";
+  const cached = fixtureOptimizationService.fixtureCache.get(cacheKey);
+  
+  let homepageData;
+  let isFromCache = false;
+  
+  if (cached) {
+    console.log("📦 Serving homepage data from cache");
+    homepageData = cached;
+    isFromCache = true;
+  } else {
+    console.log("🔄 No cache found, fetching fresh homepage data");
+    homepageData = await fixtureOptimizationService.getHomepageData();
+    isFromCache = false;
+  }
 
   res.status(200).json({
     success: true,
@@ -167,8 +182,8 @@ export const getHomepageFixtures = asyncHandler(async (req, res) => {
         ) || 0,
     },
     cache_info: {
-      cached: true,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
+      cached: isFromCache,
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
     },
     timestamp: new Date().toISOString(),
   });

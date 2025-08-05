@@ -7,9 +7,15 @@ const getLiveFixturesService = () => {
   return global.liveFixturesService;
 };
 
+// Get FixtureOptimization service instance
+const getFixtureOptimizationService = () => {
+  return global.fixtureOptimizationService;
+};
+
 // Track if jobs are currently scheduled
 let liveOddsJobScheduled = false;
 let inplayMatchesJobScheduled = false;
+let homepageCacheJobScheduled = false;
 
 // Function to schedule live odds job
 const scheduleLiveOddsJob = async () => {
@@ -19,6 +25,24 @@ const scheduleLiveOddsJob = async () => {
     liveOddsJobScheduled = true;
     console.log('[Agenda] updateLiveOdds job scheduled successfully');
   }
+};
+
+// Function to schedule homepage cache job
+const scheduleHomepageCacheJob = async () => {
+  if (!homepageCacheJobScheduled) {
+    console.log('[Agenda] Scheduling refreshHomepageCache job...');
+    await agenda.every("30 minutes", "refreshHomepageCache");
+    homepageCacheJobScheduled = true;
+    console.log('[Agenda] refreshHomepageCache job scheduled successfully');
+  }
+};
+
+// Function to cancel homepage cache job
+const cancelHomepageCacheJob = async () => {
+  console.log('[Agenda] Cancelling refreshHomepageCache job...');
+  await agenda.cancel({ name: 'refreshHomepageCache' });
+  homepageCacheJobScheduled = false;
+  console.log('[Agenda] refreshHomepageCache job cancelled successfully');
 };
 
 // Function to schedule inplay matches job
@@ -50,12 +74,19 @@ const cancelInplayMatchesJob = async () => {
 // Function to check fixture cache and manage jobs accordingly
 export const checkFixtureCacheAndManageJobs = async () => {
   const liveFixturesService = getLiveFixturesService();
+  const fixtureOptimizationService = getFixtureOptimizationService();
   
   if (!liveFixturesService) {
     console.log('[Agenda] LiveFixtures service not available - cancelling all jobs');
     await cancelLiveOddsJob();
     await cancelInplayMatchesJob();
+    await cancelHomepageCacheJob();
     return;
+  }
+  
+  if (!fixtureOptimizationService) {
+    console.log('[Agenda] FixtureOptimization service not available - cancelling homepage cache job');
+    await cancelHomepageCacheJob();
   }
   
   const hasFixtureData = liveFixturesService.hasFixtureCacheData();
@@ -64,10 +95,16 @@ export const checkFixtureCacheAndManageJobs = async () => {
     console.log('[Agenda] Fixture cache has data - scheduling jobs');
     await scheduleLiveOddsJob();
     await scheduleInplayMatchesJob();
+    
+    // Only schedule homepage cache job if service is available
+    if (fixtureOptimizationService) {
+      await scheduleHomepageCacheJob();
+    }
   } else {
     console.log('[Agenda] Fixture cache is empty - cancelling jobs');
     await cancelLiveOddsJob();
     await cancelInplayMatchesJob();
+    await cancelHomepageCacheJob();
   }
 };
 
@@ -130,6 +167,32 @@ agenda.define("updateInplayMatches", async (job) => {
   }
 });
 
+// Define homepage cache refresh job
+agenda.define("refreshHomepageCache", async (job) => {
+  try {
+    console.log(`[Agenda] Starting refreshHomepageCache job at ${new Date().toISOString()}`);
+    
+    // Get the fixture optimization service
+    const fixtureOptimizationService = getFixtureOptimizationService();
+    
+    if (!fixtureOptimizationService) {
+      console.warn('[Agenda] FixtureOptimizationService not available - skipping homepage cache refresh');
+      return;
+    }
+    
+    // Clear existing cache first
+    const cacheKey = "homepage_data";
+    fixtureOptimizationService.fixtureCache.del(cacheKey);
+    console.log('[Agenda] Cleared existing homepage cache');
+    
+    // Fetch fresh homepage data (this will cache it automatically)
+    await fixtureOptimizationService.getHomepageData();
+    console.log(`[Agenda] Homepage cache refreshed successfully at ${new Date().toISOString()}`);
+  } catch (error) {
+    console.error("[Agenda] Error refreshing homepage cache:", error);
+  }
+});
+
 // Initialize agenda jobs
 export const initializeAgendaJobs = async () => {
   try {
@@ -140,8 +203,10 @@ export const initializeAgendaJobs = async () => {
     console.log('[Agenda] Force cancelling existing jobs...');
     await agenda.cancel({ name: 'updateLiveOdds' });
     await agenda.cancel({ name: 'updateInplayMatches' });
+    await agenda.cancel({ name: 'refreshHomepageCache' });
     liveOddsJobScheduled = false;
     inplayMatchesJobScheduled = false;
+    homepageCacheJobScheduled = false;
     console.log('[Agenda] Cancelled existing jobs and reset tracking');
     
     // Wait a moment for services to be fully initialized

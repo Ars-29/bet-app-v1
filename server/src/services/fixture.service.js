@@ -509,10 +509,10 @@ class FixtureOptimizationService {
     const cacheKey = "homepage_data";
     const cached = this.fixtureCache.get(cacheKey);
 
-    // Force clear cache for debugging timezone issues
+    // Return cached data if available (30 minute cache)
     if (cached) {
-      console.log("🔄 Clearing homepage cache to force fresh data with UTC timezone fixes");
-      this.fixtureCache.del(cacheKey);
+      console.log("� Returning cached homepage data");
+      return cached;
     }
 
     try {
@@ -656,8 +656,9 @@ class FixtureOptimizationService {
         // in_play: [], // Skip for now as requested
       };
 
-      // Cache for 10 minutes
-      this.fixtureCache.set(cacheKey, homepageData, 600);
+      // Cache for 30 minutes (1800 seconds)
+      console.log("💾 Caching homepage data for 30 minutes");
+      this.fixtureCache.set(cacheKey, homepageData, 1800);
       return homepageData;
     } catch (error) {
       console.error("❌ Error fetching homepage data:", error);

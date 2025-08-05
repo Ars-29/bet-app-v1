@@ -183,8 +183,7 @@ const MatchListPage = ({ config }) => {
                     ) : (<div className="space-y-4">
                         <Accordion 
                             type="multiple" 
-                            className="space-y-4" 
-                            defaultValue={leagues.map((league, index) => `league-${league.id || index}`)}
+                            className="space-y-4"
                         >
                             {leagues.map((league, index) => {
                                 // Skip leagues without matches or with invalid data
