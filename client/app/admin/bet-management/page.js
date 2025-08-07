@@ -283,7 +283,7 @@ export default function BetManagement() {
                 {bet.combination.map((leg, index) => {
                   const calculateLegProfit = () => {
                     if (leg.status.toLowerCase() === 'won') {
-                      return ((bet.stake * leg.odds) - bet.stake).toFixed(2);
+                      return (bet.stake * leg.odds).toFixed(2);
                     } else if (leg.status.toLowerCase() === 'lost') {
                       return bet.stake.toFixed(2);
                     }
@@ -1254,7 +1254,7 @@ export default function BetManagement() {
                               )}
                             </TableCell>
                             <TableCell>{bet.user}</TableCell>
-                            <TableCell>{formatAmount(bet.stake)}</TableCell>
+                            <TableCell>{isCombo ? formatAmount(bet.stake * bet.combination.length) : formatAmount(bet.stake)}</TableCell>
                             <TableCell>{parseFloat(bet.odds).toFixed(2)}</TableCell>
                             <TableCell>
                               <div>
@@ -1304,7 +1304,7 @@ export default function BetManagement() {
                             <TableCell>
                               {bet.status.toLowerCase() === "won" ? (
                                 <span className="font-medium text-green-600">
-                                  +${((bet.stake * bet.odds) - bet.stake).toFixed(2)}
+                                  +${(bet.stake * bet.odds).toFixed(2)}
                                 </span>
                               ) : bet.status.toLowerCase() === "pending" ? (
                                 <span className="text-gray-500">Pending</span>

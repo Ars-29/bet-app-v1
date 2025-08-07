@@ -134,15 +134,6 @@ const BettingHistoryPage = ({ userId }) => {
               </TableHeader>
               <TableBody>
                 {bet.combination.map((leg, index) => {
-                  const calculateLegProfit = () => {
-                    if (leg.status.toLowerCase() === 'won') {
-                      return ((bet.stake * leg.odds) - bet.stake).toFixed(2);
-                    } else if (leg.status.toLowerCase() === 'lost') {
-                      return bet.stake.toFixed(2);
-                    }
-                    return 0;
-                  };
-
                   return (
                     <TableRow key={index} className="text-[12px] hover:bg-gray-100">
                       <TableCell className="font-medium text-purple-600">
@@ -433,7 +424,7 @@ const BettingHistoryPage = ({ userId }) => {
                               )}
                             </TableCell>
                             <TableCell>
-                              {formatAmount(item.stake)}
+                              {isCombo ? formatAmount(item.stake * item.combination.length) : formatAmount(item.stake)}
                             </TableCell>
                             <TableCell>{parseFloat(item.odds).toFixed(2)}</TableCell>
                             <TableCell>
@@ -490,7 +481,7 @@ const BettingHistoryPage = ({ userId }) => {
                             <TableCell>
                               {item.status.toLowerCase() === "won" ? (
                                 <span className="font-medium text-green-600">
-                                  +${((item.stake * item.odds) - item.stake).toFixed(2)}
+                                  +${(item.stake * item.odds).toFixed(2)}
                                 </span>
                               ) : item.status.toLowerCase() === "pending" ? (
                                 <span className="text-gray-500">Pending</span>

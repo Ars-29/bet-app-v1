@@ -1309,13 +1309,21 @@ export default class BaseBetOutcomeCalculationService {
    */
   calculateCleanSheet(bet, matchData) {
     const scores = this.extractMatchScores(matchData);
-    const betOption = bet.betOption.toLowerCase();
-
+    
+    // Get team identifier from betDetails.label or betOption
+    const teamLabel = bet.betDetails?.label || bet.betOption;
+    const betSelection = bet.betDetails?.name || bet.betOption;
+    
     let hasCleanSheet = false;
-    if (betOption.includes("home")) {
+    let teamName = "";
+    
+    // Determine team and clean sheet status based on label
+    if (teamLabel === "1" || teamLabel === "home") {
       hasCleanSheet = scores.awayScore === 0;
-    } else if (betOption.includes("away")) {
+      teamName =  "Home Team";
+    } else if (teamLabel === "2" || teamLabel === "away") {
       hasCleanSheet = scores.homeScore === 0;
+      teamName ="Away Team";
     } else {
       return {
         status: "canceled",
@@ -1324,17 +1332,18 @@ export default class BaseBetOutcomeCalculationService {
       };
     }
 
-    const betSelection = this.normalizeBetSelection(bet.betOption);
-    const isYesBet =
-      this.resultMappings.YES.includes(betSelection) ||
-      betOption.includes("yes");
+    // Determine if this is a Yes or No bet
+    const isYesBet = this.resultMappings.YES.includes(betSelection?.toLowerCase()) || 
+                    betSelection?.toLowerCase() === "yes";
     const isWinning = isYesBet ? hasCleanSheet : !hasCleanSheet;
 
     return {
       status: isWinning ? "won" : "lost",
       payout: isWinning ? bet.stake * bet.odds : 0,
       hasCleanSheet: hasCleanSheet,
-      reason: `Clean sheet: ${hasCleanSheet ? "Yes" : "No"}`,
+      teamName: teamName,
+      betSelection: betSelection,
+      reason: `${teamName} clean sheet: ${hasCleanSheet ? "Yes" : "No"} (Bet: ${betSelection})`,
     };
   }
 

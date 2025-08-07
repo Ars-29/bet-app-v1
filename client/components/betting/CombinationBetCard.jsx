@@ -26,10 +26,11 @@ const CombinationBetCard = ({ bet, isExpanded, onToggle }) => {
   };
 
   const calculateProfit = () => {
+    const totalStake = bet.stake * bet.combination.length;
     if (bet.status.toLowerCase() === 'won') {
-      return ((bet.stake * bet.odds) - bet.stake).toFixed(2);
+      return (totalStake * bet.odds).toFixed(2);
     } else if (bet.status.toLowerCase() === 'lost') {
-      return bet.stake.toFixed(2);
+      return totalStake.toFixed(2);
     }
     return 0;
   };
@@ -54,7 +55,7 @@ const CombinationBetCard = ({ bet, isExpanded, onToggle }) => {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-lg font-semibold">{formatAmount(bet.stake)}</div>
+            <div className="text-lg font-semibold">{formatAmount(bet.stake * bet.combination.length)}</div>
             <div className="text-sm text-gray-500">Stake</div>
           </div>
         </div>
@@ -69,7 +70,7 @@ const CombinationBetCard = ({ bet, isExpanded, onToggle }) => {
             </div>
             <div>
               <span className="text-sm text-gray-500">Potential Win:</span>
-              <span className="ml-2 font-semibold">{formatAmount(bet.stake * bet.odds)}</span>
+              <span className="ml-2 font-semibold">{formatAmount((bet.stake * bet.combination.length) * bet.odds)}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">

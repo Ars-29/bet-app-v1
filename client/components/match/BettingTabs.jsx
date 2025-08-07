@@ -425,6 +425,11 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
             return renderMatchGoalsOptions(options, section);
         }
         
+        // Special rendering for Clean Sheet markets (Yes/No partition)
+        if (section.title?.toLowerCase().includes('clean sheet')) {
+            return renderCleanSheetOptions(options, section);
+        }
+        
         // Special handling for correct score markets
         const isCorrectScoreMarket =
             section.title?.toLowerCase().includes('correct score');
@@ -548,8 +553,9 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
                     } else if (section.title && section.title.toLowerCase().includes('winning margin')) {
                         name = option.name;
                     } else if ((option.label === '1' || option.label === '2') && matchData?.participants?.length >= 2
-                               && !section.title.toLowerCase().includes('specials')) {
-                        // Only set name to team name for 1/2 if NOT Specials
+                               && !section.title.toLowerCase().includes('specials')
+                               && !section.title.toLowerCase().includes('clean sheet')) {
+                        // Only set name to team name for 1/2 if NOT Specials and NOT Clean Sheet
                         name = option.label === '1' ? matchData.participants[0].name : matchData.participants[1].name;
                     } else {
                         name = option.name;
@@ -960,6 +966,84 @@ const BettingMarketGroup = ({ groupedMarkets, emptyMessage, matchData }) => {
                         />
                     );
                 })}
+            </div>
+        );
+    };
+
+    // Special rendering function for Clean Sheet markets (Yes/No partition)
+    const renderCleanSheetOptions = (options, section) => {
+        const team1 = matchData?.participants?.[0]?.name || 'Team 1';
+        const team2 = matchData?.participants?.[1]?.name || 'Team 2';
+        
+        // Separate options by Yes/No
+        const yesOptions = options.filter(opt => opt.name === 'Yes');
+        const noOptions = options.filter(opt => opt.name === 'No');
+        
+        return (
+            <div className="flex flex-col min-[640px]:flex-row gap-2">
+                {/* No Options (Top on mobile, Left on desktop) */}
+                <div className="flex-1">
+                   
+                    <div className="grid grid-cols-1 gap-1">
+                        {yesOptions.map((option, idx) => {
+                            return (
+                                <BettingOptionButton
+                                    key={`no-${option.label}-${idx}`}
+                                    label={option.label}
+                                    value={option.value}
+                                    sectionType={section?.type || 'market'}
+                                    optionId={option?.id}
+                                    matchData={matchData}
+                                    isResultOption={false}
+                                    isHandicapOption={false}
+                                    isHalfTimeOption={false}
+                                    isOverUnderOption={false}
+                                    isGoalScorerOption={false}
+                                    handicapValue={option.handicap}
+                                    halfIndicator={option.halfIndicator}
+                                    thresholds={option.thresholds}
+                                    total={option.total}
+                                    name={option.name}
+                                    marketDescription={section.title}
+                                    suspended={option.suspended}
+                                    marketId={option.marketId}
+                                />
+                            );
+                        })}
+                    </div>
+                </div>
+                
+                {/* Yes Options (Bottom on mobile, Right on desktop) */}
+                <div className="flex-1">
+                   
+                    <div className="grid grid-cols-1 gap-1">
+                        {noOptions.map((option, idx) => {
+                            return (
+                                <BettingOptionButton
+                                    key={`yes-${option.label}-${idx}`}
+                                    label={option.label}
+                                    value={option.value}
+                                    sectionType={section?.type || 'market'}
+                                    optionId={option?.id}
+                                    matchData={matchData}
+                                    isResultOption={false}
+                                    isHandicapOption={false}
+                                    isHalfTimeOption={false}
+                                    isOverUnderOption={false}
+                                    isGoalScorerOption={false}
+                                    handicapValue={option.handicap}
+                                    halfIndicator={option.halfIndicator}
+                                    thresholds={option.thresholds}
+                                    total={option.total}
+                                    name={option.name}
+                                    marketDescription={section.title}
+                                    suspended={option.suspended}
+                                    marketId={option.marketId}
+                                />
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         );
     };
@@ -1388,6 +1472,22 @@ const BettingOptionButton = ({
                 <div className="flex items-center gap-1">
                     <span>{mainLabel}</span>
                     <span className="bg-white/20 px-1 rounded text-[8px] min-[400px]:text-[9px]">{handicapValue}</span>
+                </div>
+            );
+        }
+
+        // For Clean Sheet markets: show team name and "Yes"/"No" as badge
+        if (
+            marketDescription &&
+            marketDescription.toLowerCase().includes('clean sheet') &&
+            (label === '1' || label === '2') &&
+            name
+        ) {
+            const teamName = label === '1' ? team1 : team2;
+            return (
+                <div className="flex items-center gap-1">
+                    <span>{teamName}</span>
+                    <span className="bg-white/20 px-1 rounded text-[8px] min-[400px]:text-[9px]">{name}</span>
                 </div>
             );
         }
