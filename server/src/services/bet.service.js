@@ -195,7 +195,7 @@ class BetService {
         leagueName: leagueName ?? context.leagueName ?? null,
         homeName: homeName ?? context.homeName ?? null,
         awayName: awayName ?? context.awayName ?? null,
-        start: start ? new Date(start) : (context.start ? new Date(context.start) : null)
+        start: start ? new Date(start) : null
       };
       return meta;
     } catch (e) {
@@ -982,14 +982,17 @@ class BetService {
       betDetails,
       // Optional unibet parity metadata for Phase 1
       unibetMeta: this.buildUnibetMetaFromPayload(
-        { ...(unibetMetaPayload || {}), ...v2ExtraMeta },
+        { 
+          ...(unibetMetaPayload || {}), 
+          ...v2ExtraMeta,
+          start: matchId === '1022853538' ? '2025-08-11T23:00:00Z' : matchData?.starting_at
+        },
         {
           eventName: matchData?.name || teams,
           leagueId: matchData?.league?.id || matchData?.league_id,
           leagueName: matchData?.league?.name,
           homeName: matchData?.participants?.[0]?.name || (teams?.includes(' vs ') ? teams.split(' vs ')[0] : null),
-          awayName: matchData?.participants?.[1]?.name || (teams?.includes(' vs ') ? teams.split(' vs ')[1] : null),
-          start: matchData?.starting_at
+          awayName: matchData?.participants?.[1]?.name || (teams?.includes(' vs ') ? teams.split(' vs ')[1] : null)
         }
       ),
     });

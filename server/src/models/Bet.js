@@ -45,6 +45,14 @@ const betSchema = new mongoose.Schema(
       enum: ["pending", "won", "lost", "canceled"],
       default: "pending",
     },
+    result: {
+      actualOutcome: { type: String, default: null },
+      finalScore: { type: String, default: null },
+      fotmobMatchId: { type: String, default: null },
+      reason: { type: String, default: null },
+      processedAt: { type: Date, default: null },
+      similarity: { type: Number, default: null }
+    },
     matchDate: {
       type: Date,
       required: false,

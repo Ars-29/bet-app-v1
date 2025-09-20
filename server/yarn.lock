@@ -1003,6 +1003,13 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
+"@max-xoo/fotmob@^2.5.1":
+  version "2.5.1"
+  resolved "https://registry.npmjs.org/@max-xoo/fotmob/-/fotmob-2.5.1.tgz"
+  integrity sha512-Q/MQGYorWrgY4oNLEp0bDQTJ8mQgE2V8aVnw3f18CmE4+MP0vuyo8G65yUCqH8YzuzNCtLl1M/+kkUQZWut14w==
+  dependencies:
+    axios "^1.7.9"
+
 "@mongodb-js/saslprep@^1.1.0", "@mongodb-js/saslprep@^1.1.9":
   version "1.2.2"
   resolved "https://registry.npmjs.org/@mongodb-js/saslprep/-/saslprep-1.2.2.tgz"
@@ -1634,7 +1641,7 @@ asynckit@^0.4.0:
   resolved "https://registry.npmjs.org/asynckit/-/asynckit-0.4.0.tgz"
   integrity sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==
 
-axios@^1.9.0:
+axios@^1.7.9, axios@^1.9.0:
   version "1.9.0"
   resolved "https://registry.npmjs.org/axios/-/axios-1.9.0.tgz"
   integrity sha512-re4CqKTJaURpzbLHtIi6XpDv20/CnpXOtjRY5/CU32L8gU8ek9UIivcfvSWvmKEngmVbrUtPpdDwWDWL7DNHvg==

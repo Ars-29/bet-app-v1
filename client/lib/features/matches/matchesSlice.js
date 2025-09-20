@@ -197,14 +197,20 @@ export const silentUpdateMatchByIdV2 = createAsyncThunk(
   "matches/silentUpdateMatchByIdV2",
   async (eventId, { rejectWithValue }) => {
     try {
-      const data = await matchesService.getBetOffersV2(eventId, { noCache: true });
+      const data = await matchesService.getBetOffersV2(eventId, { noCache: true, silent: true });
+      
+      // If silent update returns null (due to error), don't update state
+      if (!data) {
+        return rejectWithValue("Silent update failed - no data returned");
+      }
+      
       if (data.success) {
         return {
           eventId,
           matchData: data,
           betOffers: data.data?.betOffers || [],
           timestamp: data.timestamp,
-          source: 'unibet-api'
+          source: data.source || 'unibet-api'
         };
       } else {
         throw new Error(data.message || 'Failed to fetch match data');
@@ -519,8 +525,10 @@ const matchesSlice = createSlice({
         state.lastUpdatedV2 = timestamp;
       })
       .addCase(silentUpdateMatchByIdV2.rejected, (state, action) => {
-        // keep last data; optionally store error
-        state.matchDetailV2Error = action.payload || state.matchDetailV2Error;
+        // For silent updates, don't update error state to avoid showing errors in UI
+        // Just log the error for debugging
+        console.warn('Silent update failed:', action.payload);
+        // Keep existing data and don't update error state
       });
   },
 });

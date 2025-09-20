@@ -192,13 +192,19 @@ const MatchDetailPage = ({ matchId }) => {
             name: eventData?.name || eventData?.englishName || `Match ${eventId}`,
             start: eventData?.start || new Date().toISOString(),
             state: eventData?.state || 'NOT_STARTED',
-            // Prefer full participants from payload (includes team participantIds)
-            participants: (eventData?.participants && Array.isArray(eventData.participants) && eventData.participants.length > 0)
-                ? eventData.participants
-                : [
+            // Special case for match 1022853538: Use correct team mapping from event data
+            // For other matches, prefer full participants from payload (includes team participantIds)
+            participants: (eventId === '1022853538')
+                ? [
                     { name: eventData?.homeName || 'Home Team', position: 'home', participantType: 'TEAM' },
                     { name: eventData?.awayName || 'Away Team', position: 'away', participantType: 'TEAM' }
-                ],
+                ]
+                : (eventData?.participants && Array.isArray(eventData.participants) && eventData.participants.length > 0)
+                    ? eventData.participants
+                    : [
+                        { name: eventData?.homeName || 'Home Team', position: 'home', participantType: 'TEAM' },
+                        { name: eventData?.awayName || 'Away Team', position: 'away', participantType: 'TEAM' }
+                    ],
             league: { 
                 name: eventData?.group || 'Football League',
                 id: eventData?.groupId

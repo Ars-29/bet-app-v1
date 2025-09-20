@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import betService from "../services/bet.service.js";
 const connectDB = async () => {
-  const mongoURI = process.env.MONGODB_URI || "mongodb://localhost:27017/bet-app";
+  const mongoURI = process.env.MONGODB_URI;
   
   mongoose
     .connect(mongoURI)

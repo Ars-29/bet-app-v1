@@ -1,6 +1,8 @@
 import agenda from "./agenda.js";
 import BetService from "../services/bet.service.js";
 import LiveFixturesService from "../services/LiveFixtures.service.js";
+import { UnibetCalcController } from "../controllers/unibetCalc.controller.js";
+import { FotmobController } from "../controllers/fotmob.controller.js";
 
 // Get LiveFixtures service instance
 const getLiveFixturesService = () => {
@@ -16,6 +18,8 @@ const getFixtureOptimizationService = () => {
 let liveOddsJobScheduled = false;
 let inplayMatchesJobScheduled = false;
 let homepageCacheJobScheduled = false;
+let betProcessingJobScheduled = false;
+let fotmobCacheJobScheduled = false;
 
 // Function to schedule live odds job
 const scheduleLiveOddsJob = async () => {
@@ -71,6 +75,42 @@ const cancelInplayMatchesJob = async () => {
   console.log('[Agenda] updateInplayMatches job cancelled successfully');
 };
 
+// Function to schedule bet processing job
+const scheduleBetProcessingJob = async () => {
+  if (!betProcessingJobScheduled) {
+    console.log('[Agenda] Scheduling automated bet processing job...');
+    await agenda.every("5 seconds", "processPendingBets"); // Changed from 5 minutes to 5 seconds for testing
+    betProcessingJobScheduled = true;
+    console.log('[Agenda] Automated bet processing job scheduled successfully');
+  }
+};
+
+// Function to cancel bet processing job
+const cancelBetProcessingJob = async () => {
+  console.log('[Agenda] Cancelling automated bet processing job...');
+  await agenda.cancel({ name: 'processPendingBets' });
+  betProcessingJobScheduled = false;
+  console.log('[Agenda] Automated bet processing job cancelled successfully');
+};
+
+// Function to schedule FotMob cache refresh job
+const scheduleFotmobCacheJob = async () => {
+  if (!fotmobCacheJobScheduled) {
+    console.log('[Agenda] Scheduling FotMob multi-day cache refresh job...');
+    await agenda.every("24 hours", "refreshFotmobMultidayCache");
+    fotmobCacheJobScheduled = true;
+    console.log('[Agenda] FotMob multi-day cache refresh job scheduled successfully');
+  }
+};
+
+// Function to cancel FotMob cache refresh job
+const cancelFotmobCacheJob = async () => {
+  console.log('[Agenda] Cancelling FotMob multi-day cache refresh job...');
+  await agenda.cancel({ name: 'refreshFotmobMultidayCache' });
+  fotmobCacheJobScheduled = false;
+  console.log('[Agenda] FotMob multi-day cache refresh job cancelled successfully');
+};
+
 // Function to check fixture cache and manage jobs accordingly
 export const checkFixtureCacheAndManageJobs = async () => {
   const liveFixturesService = getLiveFixturesService();
@@ -115,6 +155,13 @@ export const checkFixtureCacheAndManageJobs = async () => {
     await cancelInplayMatchesJob();
     await cancelHomepageCacheJob();
   }
+  
+  // Always schedule automated bet processing and FotMob cache refresh
+  console.log('[Agenda] Scheduling automated bet processing job...');
+  await scheduleBetProcessingJob();
+  
+  console.log('[Agenda] Scheduling FotMob multi-day cache refresh job...');
+  await scheduleFotmobCacheJob();
 };
 
 // Function to check if there are live matches in cache
@@ -245,21 +292,89 @@ agenda.define("refreshHomepageCache", async (job) => {
   }
 });
 
+// Define automated bet processing job
+agenda.define("processPendingBets", async (job) => {
+  try {
+    const unibetCalcController = new UnibetCalcController();
+    
+    // Process pending bets (finished matches only)
+    const result = await unibetCalcController.processAll({
+      body: { limit: 50, onlyPending: true }
+    }, {
+      json: (data) => {
+        // Only log if there were actual changes
+        if (data.stats && (data.stats.processed > 0 || data.stats.failed > 0)) {
+          console.log(`[Agenda] Bet processing: ${data.stats.processed} processed, ${data.stats.failed} failed`);
+        }
+      }
+    });
+    
+    // Only log completion every 10th run to reduce noise
+    if (job.attrs.nextRunAt && job.attrs.nextRunAt.getTime() % 10 === 0) {
+      console.log(`[Agenda] Automated bet processing completed at ${new Date().toISOString()}`);
+    }
+  } catch (error) {
+    console.error("[Agenda] Error in automated bet processing:", error);
+  }
+});
+
+// Define FotMob multi-day cache refresh job
+agenda.define("refreshFotmobMultidayCache", async (job) => {
+  try {
+    console.log(`[Agenda] Starting FotMob multi-day cache refresh job at ${new Date().toISOString()}`);
+    
+    const fotmobController = new FotmobController();
+    
+    // Refresh multi-day cache (7 days)
+    await fotmobController.refreshMultidayCache({
+      body: { days: 7 }
+    }, {
+      json: (data) => {
+        console.log(`[Agenda] FotMob cache refresh completed:`, data);
+      }
+    });
+    
+    console.log(`[Agenda] FotMob multi-day cache refresh completed at ${new Date().toISOString()}`);
+  } catch (error) {
+    console.error("[Agenda] Error refreshing FotMob multi-day cache:", error);
+  }
+});
+
 // Initialize agenda jobs
 export const initializeAgendaJobs = async () => {
   try {
     await agenda.start();
     console.log('[Agenda] Agenda started successfully');
     
-    // Force cancel any existing jobs and reset tracking
-    console.log('[Agenda] Force cancelling existing jobs...');
+    // Aggressive cleanup - remove ALL existing jobs
+    console.log('[Agenda] Cleaning up all existing jobs...');
+    const existingJobs = await agenda.jobs({});
+    console.log(`[Agenda] Found ${existingJobs.length} existing jobs to clean up`);
+    
+    // Cancel all jobs by name
     await agenda.cancel({ name: 'updateLiveOdds' });
     await agenda.cancel({ name: 'updateInplayMatches' });
     await agenda.cancel({ name: 'refreshHomepageCache' });
+    await agenda.cancel({ name: 'processPendingBets' });
+    await agenda.cancel({ name: 'refreshFotmobMultidayCache' });
+    await agenda.cancel({ name: 'checkBetOutcome' }); // Cancel old bet outcome jobs
+    
+    // Remove any remaining jobs
+    for (const job of existingJobs) {
+      try {
+        await job.remove();
+      } catch (error) {
+        console.warn(`[Agenda] Could not remove job ${job.attrs.name}:`, error.message);
+      }
+    }
+    
+    // Reset tracking flags
     liveOddsJobScheduled = false;
     inplayMatchesJobScheduled = false;
     homepageCacheJobScheduled = false;
-    console.log('[Agenda] Cancelled existing jobs and reset tracking');
+    betProcessingJobScheduled = false;
+    fotmobCacheJobScheduled = false;
+    console.log('[Agenda] Cleaned up all existing jobs and reset tracking');
     
     // Wait a moment for services to be fully initialized
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -269,11 +384,22 @@ export const initializeAgendaJobs = async () => {
     
     console.log('[Agenda] Agenda jobs initialization completed');
     
-    // Log current scheduled jobs
+    // Log current scheduled jobs (summary only)
     const jobs = await agenda.jobs({});
     console.log(`[Agenda] Total scheduled jobs: ${jobs.length}`);
+    
+    // Group jobs by name and show summary
+    const jobSummary = {};
     jobs.forEach(job => {
-      console.log(`[Agenda] Job: ${job.attrs.name}, Next run: ${job.attrs.nextRunAt}, Interval: ${job.attrs.repeatInterval}`);
+      const name = job.attrs.name;
+      if (!jobSummary[name]) {
+        jobSummary[name] = { count: 0, nextRun: job.attrs.nextRunAt, interval: job.attrs.repeatInterval };
+      }
+      jobSummary[name].count++;
+    });
+    
+    Object.entries(jobSummary).forEach(([name, info]) => {
+      console.log(`[Agenda] Job: ${name}, Count: ${info.count}, Next run: ${info.nextRun}, Interval: ${info.interval}`);
     });
     
   } catch (error) {

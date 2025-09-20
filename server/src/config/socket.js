@@ -11,9 +11,18 @@ export const initializeSocket = (server) => {
     }
   });
 
+  // Make io available globally
+  global.io = io;
+
   // Socket.IO connection handling
   io.on('connection', (socket) => {
     console.log(`🔌 Socket connected: ${socket.id}`);
+    
+    // Join user room if authenticated
+    socket.on('joinUserRoom', (userId) => {
+      socket.join(`user_${userId}`);
+      console.log(`👤 Socket ${socket.id} joined user_${userId} room`);
+    });
     
     // Join live matches room
     socket.on('joinLiveMatches', () => {

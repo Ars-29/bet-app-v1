@@ -101,12 +101,18 @@ class MatchesService {
       const response = await apiClient.get(`/v2/betoffers/${eventId}` , { params });
       
       if (response.data.success) {
-        console.log(`✅ Successfully fetched bet offers for event: ${eventId}`);
+        console.log(`✅ Successfully fetched bet offers for event: ${eventId} (source: ${response.data.source || 'unknown'})`);
         return response.data;
       } else {
         throw new Error(response.data.message || 'Failed to fetch bet offers');
       }
     } catch (error) {
+      // For silent updates (polling), don't throw errors - just return null
+      if (opts.silent) {
+        console.warn(`⚠️ Silent update failed for event ${eventId}:`, error.message);
+        return null;
+      }
+      
       console.error('❌ Error fetching bet offers:', error);
       throw new Error(
         error.response?.data?.message ||

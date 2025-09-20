@@ -5,6 +5,7 @@ import {
   updateLiveOdds, 
   updateLiveMatches
 } from '../features/websocket/websocketSlice';
+import { getMe } from '../features/auth/authSlice';
 
 class WebSocketService {
   constructor() {
@@ -27,6 +28,12 @@ class WebSocketService {
       
       // Join live matches room by default
       this.socket.emit('joinLiveMatches');
+      
+      // Join user room if authenticated
+      const state = store.getState();
+      if (state.auth.user?._id) {
+        this.socket.emit('joinUserRoom', state.auth.user._id);
+      }
     });
 
     this.socket.on('disconnect', () => {
@@ -92,6 +99,20 @@ class WebSocketService {
           timestamp: update.timestamp
         }));
       });
+    });
+
+    // Bet processing complete event
+    this.socket.on('betProcessingComplete', (data) => {
+      console.log('🎯 [BET PROCESSING] Bet processing complete:', data);
+      
+      // Refresh user data to get updated balance
+      store.dispatch(getMe());
+      
+      // Show notification if bet was won
+      if (data.betStatus === 'won') {
+        console.log(`🎉 Bet won! Payout: $${data.payout.toFixed(2)}`);
+        // You can add a toast notification here if you have a notification system
+      }
     });
 
     this.isInitialized = true;

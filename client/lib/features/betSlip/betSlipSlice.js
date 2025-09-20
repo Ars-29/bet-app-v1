@@ -275,6 +275,79 @@ export const selectTotalStake = (state) => state.betSlip.totalStake;
 export const selectPotentialReturn = (state) => state.betSlip.potentialReturn;
 export const selectLastError = (state) => state.betSlip.lastError;
 
+// Helper function to extract Unibet metadata from match data
+const extractUnibetMetadata = (bet, matchData) => {
+  console.log('🔍 Debug matchData structure:', {
+    hasData: !!matchData?.data,
+    dataKeys: matchData?.data ? Object.keys(matchData.data) : 'no data',
+    hasGroupId: !!matchData?.data?.groupId,
+    hasGroup: !!matchData?.data?.group,
+    groupId: matchData?.data?.groupId,
+    group: matchData?.data?.group,
+    // Check if it's test data structure
+    isTestData: matchData?.data?.betOffers && Array.isArray(matchData.data.betOffers),
+    // Check root level for test data
+    rootGroupId: matchData?.data?.groupId,
+    rootGroup: matchData?.data?.group,
+    // Check events array
+    hasEvents: !!matchData?.data?.events,
+    eventsLength: matchData?.data?.events?.length || 0,
+    eventsGroupId: matchData?.data?.events?.[0]?.groupId,
+    eventsGroup: matchData?.data?.events?.[0]?.group
+  });
+  
+  if (!matchData?.data?.betOffers || !Array.isArray(matchData.data.betOffers)) {
+    console.warn('No betOffers data available for metadata extraction');
+    return {};
+  }
+
+  // Find the bet offer that matches this bet
+  const betOffer = matchData.data.betOffers.find(offer => 
+    offer.outcomes?.some(outcome => outcome.id === bet.oddId)
+  );
+
+  if (!betOffer) {
+    console.warn(`No bet offer found for oddId: ${bet.oddId}`);
+    return {};
+  }
+
+  // Find the specific outcome
+  const outcome = betOffer.outcomes?.find(outcome => outcome.id === bet.oddId);
+  
+  if (!outcome) {
+    console.warn(`No outcome found for oddId: ${bet.oddId}`);
+    return {};
+  }
+
+  console.log('Extracted metadata:', {
+    betOffer: betOffer.criterion?.label,
+    outcome: outcome.label,
+    leagueId: matchData.data.groupId,
+    leagueName: matchData.data.group,
+    fullMatchData: matchData
+  });
+
+  // Extract metadata
+  return {
+    eventName: `${bet.match.team1} vs ${bet.match.team2}`,
+    marketName: betOffer.criterion?.label || betOffer.betOfferType?.name || bet.marketDescription,
+    criterionLabel: betOffer.criterion?.label || null,
+    criterionEnglishLabel: betOffer.criterion?.englishLabel || null,
+    outcomeEnglishLabel: outcome.englishLabel || outcome.label,
+    participant: outcome.participant || null,
+    participantId: outcome.participantId || null,
+    eventParticipantId: outcome.eventParticipantId || null,
+    betOfferTypeId: betOffer.betOfferType?.id || null,
+    handicapRaw: outcome.line ? Math.round(outcome.line * 1000) : null,
+    handicapLine: outcome.line || null,
+    leagueId: matchData.data.groupId || matchData.data.event?.groupId || matchData.data.events?.[0]?.groupId || null,
+    leagueName: matchData.data.group || matchData.data.event?.group || matchData.data.events?.[0]?.group || null,
+    homeName: bet.match.team1,
+    awayName: bet.match.team2,
+    start: bet.match.starting_at
+  };
+};
+
 // Thunk to place bets (supports both singles and combination bets)
 export const placeBetThunk = createAsyncThunk(
   "betSlip/placeBet",
@@ -284,6 +357,9 @@ export const placeBetThunk = createAsyncThunk(
     const activeTab = state.activeTab;
     const stakes = state.stake.singles;
     const combinationStake = state.stake.combination;
+    
+    // Get match data from Redux state for Unibet metadata extraction
+    const matchesState = getState().matches;
     
     try {
       const results = [];
@@ -296,6 +372,13 @@ export const placeBetThunk = createAsyncThunk(
           if (!bet.match.id || !bet.oddId || !stake) {
             continue; // skip invalid
           }
+          
+          // Extract Unibet metadata from match data
+          const matchData = matchesState.matchDetailsV2?.[bet.match.id]?.matchData;
+          const unibetMetadata = extractUnibetMetadata(bet, matchData);
+          
+          console.log('Unibet metadata extracted:', unibetMetadata);
+          
           // Use label for betOption and selection
           const label = bet.label || bet.selection;
           const payload = {
@@ -326,7 +409,9 @@ export const placeBetThunk = createAsyncThunk(
               isLive: true,
               matchStartTime: bet.match.starting_at,
               matchEndTime: bet.match.estimatedMatchEnd || (bet.match.starting_at ? new Date(new Date(bet.match.starting_at).getTime() + 120 * 60 * 1000).toISOString() : null)
-            })
+            }),
+            // Add Unibet metadata for enrichment
+            ...unibetMetadata
           };
                       console.log("Single bet payload:", payload);
             console.log("Single bet - matchId type:", typeof payload.matchId, "value:", payload.matchId);
@@ -348,6 +433,11 @@ export const placeBetThunk = createAsyncThunk(
         // Prepare combination data for backend
         const combinationData = bets.map(bet => {
           const label = bet.label || bet.selection;
+          
+          // Extract Unibet metadata from match data for each leg
+          const matchData = matchesState.matchDetailsV2?.[bet.match.id]?.matchData;
+          const unibetMetadata = extractUnibetMetadata(bet, matchData);
+          
           return {
             matchId: bet.match.id,
             oddId: bet.oddId,
@@ -376,7 +466,9 @@ export const placeBetThunk = createAsyncThunk(
               isLive: true,
               matchStartTime: bet.match.starting_at,
               matchEndTime: bet.match.estimatedMatchEnd || (bet.match.starting_at ? new Date(new Date(bet.match.starting_at).getTime() + 120 * 60 * 1000).toISOString() : null)
-            })
+            }),
+            // Add Unibet metadata for enrichment
+            ...unibetMetadata
           };
         });
 

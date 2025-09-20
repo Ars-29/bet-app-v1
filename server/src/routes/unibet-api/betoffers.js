@@ -5,6 +5,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 const router = express.Router();
 
+// Health check endpoint
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Betoffers route is working',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Configuration from unibet-api/config.js (matching working implementation)
 const API_BASE_URL = 'https://oc-offering-api.kambicdn.com/offering/v2018/ubau/betoffer/event';
 const API_HEADERS = {
@@ -29,7 +38,10 @@ const API_HEADERS = {
 router.get('/:eventId', async (req, res) => {
   try {
     const { eventId } = req.params;
-    console.log(`🔍 Fetching bet offers for event: ${eventId}`);
+    console.log(`🔍 [BETOFFERS] Fetching bet offers for event: ${eventId}`);
+    console.log(`🔍 [BETOFFERS] Request headers:`, req.headers);
+    console.log(`🔍 [BETOFFERS] Request method:`, req.method);
+    console.log(`🔍 [BETOFFERS] Request URL:`, req.url);
 
     // Special-case local file for testing id
     if (eventId === '1022853538') {
@@ -45,33 +57,70 @@ router.get('/:eventId', async (req, res) => {
       });
     }
 
-    const response = await axios.get(`${API_BASE_URL}/${eventId}.json`, {
-      headers: API_HEADERS,
-      timeout: 12000
-    });
-
-    console.log(`✅ Successfully fetched bet offers for event: ${eventId}`);
+    // Check cache first
+    let cachedData = null;
     try {
-      // Cache for later enrichment during bet placement
       if (global.fixtureOptimizationService?.fixtureCache) {
-        global.fixtureOptimizationService.fixtureCache.set(
-          `unibet_v2_${eventId}`,
-          { data: response.data, cachedAt: Date.now() },
-          120
-        );
+        cachedData = global.fixtureOptimizationService.fixtureCache.get(`unibet_v2_${eventId}`);
       }
     } catch (_) {}
-    return res.json({
-      success: true,
-      eventId,
-      data: response.data,
-      timestamp: new Date().toISOString()
-    });
+
+    try {
+      const response = await axios.get(`${API_BASE_URL}/${eventId}.json`, {
+        headers: API_HEADERS,
+        timeout: 12000
+      });
+
+      console.log(`✅ Successfully fetched bet offers for event: ${eventId}`);
+      
+      // Cache for later enrichment during bet placement
+      try {
+        if (global.fixtureOptimizationService?.fixtureCache) {
+          global.fixtureOptimizationService.fixtureCache.set(
+            `unibet_v2_${eventId}`,
+            { data: response.data, cachedAt: Date.now() },
+            120
+          );
+        }
+      } catch (_) {}
+      
+      return res.json({
+        success: true,
+        eventId,
+        data: response.data,
+        timestamp: new Date().toISOString(),
+        source: 'live'
+      });
+    } catch (apiError) {
+      console.warn(`⚠️ External API failed for event ${eventId}:`, apiError.message);
+      
+      // If we have cached data, return it instead of failing
+      if (cachedData?.data) {
+        console.log(`📦 Returning cached data for event: ${eventId}`);
+        return res.json({
+          success: true,
+          eventId,
+          data: cachedData.data,
+          timestamp: new Date().toISOString(),
+          source: 'cache',
+          warning: 'Using cached data due to API failure'
+        });
+      }
+      
+      // No cache available, return error
+      console.error('❌ No cached data available for event:', eventId);
+      res.status(404).json({
+        success: false,
+        error: 'Match not found',
+        message: `No betting offers available for event ${eventId}`,
+        timestamp: new Date().toISOString()
+      });
+    }
   } catch (error) {
-    console.error('❌ Error fetching bet offers:', error);
+    console.error('❌ Unexpected error fetching bet offers:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch bet offers',
+      error: 'Internal server error',
       message: error.message,
       timestamp: new Date().toISOString()
     });
