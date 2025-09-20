@@ -2,6 +2,100 @@ import express from 'express';
 import axios from 'axios';
 const router = express.Router();
 
+// In-memory cache for live matches
+let ALL_FOOTBALL_CACHE = {
+  data: null,
+  lastUpdated: null,
+  isRefreshing: false
+};
+
+// Cache duration: 2 minutes
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes in milliseconds
+
+// Function to fetch data with retry logic
+async function fetchWithRetry(url, headers, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Attempt ${attempt}/${maxRetries} - Fetching live matches from Unibet API...`);
+      
+      const response = await axios.get(url, {
+        headers,
+        timeout: 12000
+      });
+      
+      if (response.status === 200) {
+        console.log(`✅ Successfully fetched data on attempt ${attempt}`);
+        return response.data;
+      }
+    } catch (error) {
+      console.error(`❌ Attempt ${attempt} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retry (exponential backoff)
+      const waitTime = Math.pow(2, attempt) * 1000;
+      console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+}
+
+// Function to refresh cache
+async function refreshAllFootballCache() {
+  if (ALL_FOOTBALL_CACHE.isRefreshing) {
+    console.log('🔄 Cache refresh already in progress, skipping...');
+    return;
+  }
+
+  ALL_FOOTBALL_CACHE.isRefreshing = true;
+  
+  try {
+    const url = `${ALL_FOOTBALL_API_URL}?includeParticipants=true&useCombined=true&ncid=${Date.now()}`;
+    const data = await fetchWithRetry(url, ALL_FOOTBALL_HEADERS);
+    
+    const { allMatches, liveMatches, upcomingMatches } = extractFootballMatches(data);
+    
+    ALL_FOOTBALL_CACHE.data = {
+      success: true,
+      matches: liveMatches,
+      allMatches: allMatches,
+      upcomingMatches: upcomingMatches,
+      totalMatches: liveMatches.length,
+      totalAllMatches: allMatches.length,
+      lastUpdated: new Date().toISOString(),
+      source: 'unibet-all-football-api',
+      debug: {
+        totalEventsFound: allMatches.length,
+        liveEventsWithOdds: liveMatches.length,
+        upcomingEventsWithOdds: upcomingMatches.length
+      }
+    };
+    
+    ALL_FOOTBALL_CACHE.lastUpdated = new Date();
+    console.log(`✅ Cache refreshed successfully: ${liveMatches.length} live matches, ${upcomingMatches.length} upcoming matches`);
+    
+  } catch (error) {
+    console.error('❌ Failed to refresh cache:', error.message);
+    // Don't update cache on error, keep existing data
+  } finally {
+    ALL_FOOTBALL_CACHE.isRefreshing = false;
+  }
+}
+
+// Function to ensure cache is warm
+async function ensureAllFootballCacheWarm() {
+  const now = new Date();
+  const isCacheExpired = !ALL_FOOTBALL_CACHE.lastUpdated || 
+                        (now.getTime() - ALL_FOOTBALL_CACHE.lastUpdated.getTime()) > CACHE_DURATION;
+  
+  if (!ALL_FOOTBALL_CACHE.data || isCacheExpired) {
+    console.log('🔄 Cache is empty or expired, refreshing...');
+    await refreshAllFootballCache();
+  }
+}
+
 // Configuration matching the working unibet-api
 const ALL_FOOTBALL_API_URL = 'https://www.unibet.com.au/sportsbook-feeds/views/filter/football/all/matches';
 const ALL_FOOTBALL_HEADERS = {
@@ -23,40 +117,108 @@ const ALL_FOOTBALL_HEADERS = {
 // GET /api/v2/live-matches
 router.get('/', async (req, res) => {
   try {
-    console.log('🔍 Fetching live matches from Unibet API...');
+    // Ensure cache is warm
+    await ensureAllFootballCacheWarm();
     
-    // Build URL with required parameters (like working unibet-api)
-    const url = `${ALL_FOOTBALL_API_URL}?includeParticipants=true&useCombined=true&ncid=${Date.now()}`;
-    
-    const response = await axios.get(url, {
-      headers: ALL_FOOTBALL_HEADERS,
-      timeout: 12000
-    });
-    
-    const data = response.data;
-    const { allMatches, liveMatches, upcomingMatches } = extractFootballMatches(data);
-    
-    console.log(`✅ Successfully fetched ${allMatches.length} total matches (${liveMatches.length} live, ${upcomingMatches.length} upcoming)`);
-    
-    res.json({
-      success: true,
-      matches: liveMatches, // Return only live matches
-      allMatches: allMatches,
-      upcomingMatches: upcomingMatches,
-      totalMatches: liveMatches.length,
-      totalAllMatches: allMatches.length,
-      lastUpdated: new Date().toISOString(),
-      source: 'unibet-all-football-api'
-    });
+    // Return cached data
+    if (ALL_FOOTBALL_CACHE.data) {
+      console.log(`📦 Serving live matches from cache (${ALL_FOOTBALL_CACHE.data.matches.length} live matches)`);
+      res.json(ALL_FOOTBALL_CACHE.data);
+    } else {
+      // Fallback: try to fetch fresh data
+      console.log('🔄 No cached data available, attempting fresh fetch...');
+      const url = `${ALL_FOOTBALL_API_URL}?includeParticipants=true&useCombined=true&ncid=${Date.now()}`;
+      const data = await fetchWithRetry(url, ALL_FOOTBALL_HEADERS);
+      const { allMatches, liveMatches, upcomingMatches } = extractFootballMatches(data);
+      
+      const responseData = {
+        success: true,
+        matches: liveMatches,
+        allMatches: allMatches,
+        upcomingMatches: upcomingMatches,
+        totalMatches: liveMatches.length,
+        totalAllMatches: allMatches.length,
+        lastUpdated: new Date().toISOString(),
+        source: 'unibet-all-football-api',
+        debug: {
+          totalEventsFound: allMatches.length,
+          liveEventsWithOdds: liveMatches.length,
+          upcomingEventsWithOdds: upcomingMatches.length
+        }
+      };
+      
+      // Update cache with fresh data
+      ALL_FOOTBALL_CACHE.data = responseData;
+      ALL_FOOTBALL_CACHE.lastUpdated = new Date();
+      
+      res.json(responseData);
+    }
   } catch (error) {
     console.error('❌ Error fetching live matches:', error);
+    
+    // If we have cached data, serve it even if it's stale
+    if (ALL_FOOTBALL_CACHE.data) {
+      console.log('📦 Serving stale cached data due to API error');
+      res.json({
+        ...ALL_FOOTBALL_CACHE.data,
+        warning: 'Serving cached data due to API error',
+        cacheAge: Math.floor((new Date().getTime() - ALL_FOOTBALL_CACHE.lastUpdated.getTime()) / 1000 / 60) + ' minutes old'
+      });
+    } else {
+      // No cached data available, return error
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch live matches',
+        message: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+});
+
+// POST /api/v2/live-matches/refresh - Manual cache refresh
+router.post('/refresh', async (req, res) => {
+  try {
+    console.log('🔄 Manual cache refresh requested...');
+    await refreshAllFootballCache();
+    
+    if (ALL_FOOTBALL_CACHE.data) {
+      res.json({
+        success: true,
+        message: 'Cache refreshed successfully',
+        data: ALL_FOOTBALL_CACHE.data,
+        lastUpdated: ALL_FOOTBALL_CACHE.lastUpdated
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to refresh cache'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Manual cache refresh failed:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch live matches',
-      message: error.message,
-      timestamp: new Date().toISOString()
+      error: 'Failed to refresh cache',
+      message: error.message
     });
   }
+});
+
+// GET /api/v2/live-matches/status - Cache status
+router.get('/status', (req, res) => {
+  res.json({
+    success: true,
+    cache: {
+      hasData: !!ALL_FOOTBALL_CACHE.data,
+      lastUpdated: ALL_FOOTBALL_CACHE.lastUpdated,
+      isRefreshing: ALL_FOOTBALL_CACHE.isRefreshing,
+      cacheAge: ALL_FOOTBALL_CACHE.lastUpdated ? 
+        Math.floor((new Date().getTime() - ALL_FOOTBALL_CACHE.lastUpdated.getTime()) / 1000 / 60) : null,
+      totalMatches: ALL_FOOTBALL_CACHE.data?.totalMatches || 0,
+      liveMatches: ALL_FOOTBALL_CACHE.data?.matches?.length || 0
+    }
+  });
 });
 
 // Helper function to extract football matches (matching working unibet-api)
@@ -74,6 +236,7 @@ function extractFootballMatches(data) {
         tournamentWidget.matches.groups.forEach(group => {
           if (group.subGroups) {
             group.subGroups.forEach(subGroup => {
+              // Check if this subGroup has events directly
               if (subGroup.events) {
                 const parentName = subGroup.parentName || 'Football';
                 
@@ -98,8 +261,14 @@ function extractFootballMatches(data) {
                     groupId: event.groupId,
                     group: event.group,
                     participants: event.participants,
+                    nonLiveBoCount: event.nonLiveBoCount,
+                    liveBoCount: event.liveBoCount,
+                    tags: event.tags,
+                    path: event.path,
                     parentName: parentName,
                     leagueName: subGroup.name,
+                    mainBetOffer: eventData.mainBetOffer,
+                    betOffers: eventData.betOffers,
                     liveData: event.liveData ? {
                       score: event.liveData.score || '0-0',
                       period: event.liveData.period || '1st Half',
@@ -109,11 +278,72 @@ function extractFootballMatches(data) {
 
                   allMatches.push(processedEvent);
 
-                  // Categorize by state
-                  if (event.state === 'STARTED') {
+                  // Categorize by state - only include matches with betting odds
+                  const hasBettingOdds = (eventData.mainBetOffer && eventData.mainBetOffer.outcomes && eventData.mainBetOffer.outcomes.length > 0) ||
+                                        (eventData.betOffers && eventData.betOffers.length > 0);
+                  
+                  if (event.state === 'STARTED' && hasBettingOdds) {
                     liveMatches.push(processedEvent);
-                  } else if (event.state === 'NOT_STARTED') {
+                  } else if (event.state === 'NOT_STARTED' && hasBettingOdds) {
                     upcomingMatches.push(processedEvent);
+                  }
+                });
+              }
+              
+              // Check if this subGroup has nested subGroups with events
+              if (subGroup.subGroups) {
+                subGroup.subGroups.forEach(nestedSubGroup => {
+                  if (nestedSubGroup.events) {
+                    const parentName = nestedSubGroup.parentName || subGroup.parentName || 'Football';
+                    
+                    // Process events in this nested league
+                    nestedSubGroup.events.forEach(eventData => {
+                      const event = eventData.event;
+                      
+                      // Only process football matches
+                      if (event.sport !== 'FOOTBALL') {
+                        return; // Skip non-football events
+                      }
+                      
+                      const processedEvent = {
+                        id: event.id,
+                        name: event.name,
+                        englishName: event.englishName,
+                        homeName: event.homeName,
+                        awayName: event.awayName,
+                        start: event.start,
+                        state: event.state,
+                        sport: event.sport,
+                        groupId: event.groupId,
+                        group: event.group,
+                        participants: event.participants,
+                        nonLiveBoCount: event.nonLiveBoCount,
+                        liveBoCount: event.liveBoCount,
+                        tags: event.tags,
+                        path: event.path,
+                        parentName: parentName,
+                        leagueName: nestedSubGroup.name,
+                        mainBetOffer: eventData.mainBetOffer,
+                        betOffers: eventData.betOffers,
+                        liveData: event.liveData ? {
+                          score: event.liveData.score || '0-0',
+                          period: event.liveData.period || '1st Half',
+                          minute: event.liveData.minute || '0'
+                        } : null
+                      };
+
+                      allMatches.push(processedEvent);
+
+                      // Categorize by state - only include matches with betting odds
+                      const hasBettingOdds = (eventData.mainBetOffer && eventData.mainBetOffer.outcomes && eventData.mainBetOffer.outcomes.length > 0) ||
+                                            (eventData.betOffers && eventData.betOffers.length > 0);
+                      
+                      if (event.state === 'STARTED' && hasBettingOdds) {
+                        liveMatches.push(processedEvent);
+                      } else if (event.state === 'NOT_STARTED' && hasBettingOdds) {
+                        upcomingMatches.push(processedEvent);
+                      }
+                    });
                   }
                 });
               }
@@ -126,5 +356,19 @@ function extractFootballMatches(data) {
   
   return { allMatches, liveMatches, upcomingMatches };
 }
+
+// Initialize cache on startup
+console.log('🚀 Initializing live matches cache...');
+refreshAllFootballCache().then(() => {
+  console.log('✅ Live matches cache initialized');
+}).catch(error => {
+  console.error('❌ Failed to initialize cache:', error.message);
+});
+
+// Set up automatic cache refresh every 2 minutes
+setInterval(() => {
+  console.log('⏰ Scheduled cache refresh...');
+  refreshAllFootballCache();
+}, CACHE_DURATION);
 
 export default router;

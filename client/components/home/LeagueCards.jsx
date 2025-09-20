@@ -50,14 +50,14 @@ const MatchItem = ({ match, isInPlay, createBetHandler, buttonsReady, getOddButt
                 <div className="cursor-pointer hover:bg-gray-50 -mx-4 px-4 py-1 rounded">
                     <div className="flex items-center justify-between">
                         <div className="flex-1">
-                            <div className="text-[12px] mb-1 flex items-center gap-2" title={match.team1}>
+                            <div className="text-[12px] mb-1 flex items-center gap-2" title={match.team1 || match.homeName}>
                                 <span>
-                                    {match.team1.length > 6 ? `${match.team1.slice(0, 18)}...` : match.team1}
+                                    {(match.team1 || match.homeName || '').length > 6 ? `${(match.team1 || match.homeName || '').slice(0, 18)}...` : (match.team1 || match.homeName || '')}
                                 </span>
                             </div>
-                            <div className="text-[12px] flex items-center gap-2" title={match.team2}>
+                            <div className="text-[12px] flex items-center gap-2" title={match.team2 || match.awayName}>
                                 <span>
-                                    {match.team2.length > 6 ? `${match.team2.slice(0, 18)}...` : match.team2}
+                                    {(match.team2 || match.awayName || '').length > 6 ? `${(match.team2 || match.awayName || '').slice(0, 18)}...` : (match.team2 || match.awayName || '')}
                                 </span>
                             </div>
                         </div>
@@ -65,9 +65,29 @@ const MatchItem = ({ match, isInPlay, createBetHandler, buttonsReady, getOddButt
                             <div className="flex gap-1">
                                 {(() => {
                                     // Use live odds if available, otherwise fall back to match odds
-                                    const displayOdds = (isInPlay && match.isLive && liveOdds && (liveOdds.home || liveOdds.draw || liveOdds.away)) 
-                                        ? liveOdds
-                                        : match.odds;
+                                    let displayOdds;
+                                    if (isInPlay && match.isLive && liveOdds && (liveOdds.home || liveOdds.draw || liveOdds.away)) {
+                                        displayOdds = liveOdds;
+                                    } else if (match.odds) {
+                                        displayOdds = match.odds;
+                                    } else if (match.mainBetOffer && match.mainBetOffer.outcomes) {
+                                        // Convert Unibet API odds format to expected format
+                                        displayOdds = {};
+                                        match.mainBetOffer.outcomes.forEach(outcome => {
+                                            // Convert Unibet API odds format (divide by 1000)
+                                            const convertedOdds = outcome.oddsDecimal || (parseFloat(outcome.odds) / 1000).toFixed(2);
+                                            
+                                            if (outcome.label === '1' || outcome.label === 'Home') {
+                                                displayOdds['1'] = convertedOdds;
+                                            } else if (outcome.label === 'X' || outcome.label === 'Draw') {
+                                                displayOdds['X'] = convertedOdds;
+                                            } else if (outcome.label === '2' || outcome.label === 'Away') {
+                                                displayOdds['2'] = convertedOdds;
+                                            }
+                                        });
+                                    } else {
+                                        displayOdds = {};
+                                    }
                                     
                                     const isUsingLiveOdds = isInPlay && match.isLive && liveOdds && (liveOdds.home || liveOdds.draw || liveOdds.away);
                                     
@@ -694,8 +714,8 @@ const LeagueCards = ({
                     ref={scrollRef}
                     className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide"
                 >
-                    {transformed.map(league => (
-                        <div key={league.id} className="flex-shrink-0 w-96">
+                    {transformed.map((league, index) => (
+                        <div key={league.id || league.name || `league-${index}`} className="flex-shrink-0 w-96">
                             <LeagueCard
                                 league={league}
                                 isInPlay={isInPlay}

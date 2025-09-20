@@ -3,9 +3,10 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import TopPicks from './TopPicks';
+import LiveMatches from './LiveMatches';
 import LeagueCards from './LeagueCards';
 import { fetchHomepageData, selectHomeLoading, selectHomeError, selectFootballDaily } from '@/lib/features/home/homeSlice';
-import { selectLiveMatches } from '@/lib/features/websocket/websocketSlice';
+import { fetchLiveMatches, selectLiveMatches } from '@/lib/features/matches/liveMatchesSlice';
 
 const HomePage = () => {
     const dispatch = useDispatch();
@@ -17,13 +18,14 @@ const HomePage = () => {
         league.matches.some(match => (match.odds_main && Object.keys(match.odds_main).length > 0) || (match.odds && (match.odds.home || match.odds.draw || match.odds.away)))
     );
     
-    // Live matches state from WebSocket
+    // Live matches state from Unibet API
     const liveMatches = useSelector(selectLiveMatches);
 
     useEffect(() => {
         // Fetch homepage data when component mounts
         dispatch(fetchHomepageData());
-        // Live matches are fetched via WebSocket automatically
+        // Fetch live matches from Unibet API
+        dispatch(fetchLiveMatches());
     }, [dispatch]);
 
 
@@ -59,6 +61,9 @@ const HomePage = () => {
                 <div className="flex flex-col xl:flex-row gap-4 lg:gap-6">
                     {/* Main content area */}
                     <div className="flex-1 min-w-0">
+                        {/* Live Matches - using Unibet API */}
+                        <LiveMatches />
+
                         {/* Top Picks - using Redux data */}
                         <TopPicks />
 
