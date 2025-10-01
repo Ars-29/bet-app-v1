@@ -15,7 +15,7 @@ import { selectIsConnected } from '@/lib/features/websocket/websocketSlice';
 import { useLiveOdds } from '@/hooks/useLiveOdds';
 
 // Match Item Component
-const MatchItem = ({ match, isInPlay, createBetHandler, buttonsReady, getOddButtonClass, isOddClickable }) => {
+const MatchItem = ({ match, isInPlay, createBetHandler, buttonsReady, getOddButtonClass, isOddClickable, hideOdds = false }) => {
     const liveOdds = useLiveOdds(match.id);
     
     return (
@@ -62,8 +62,9 @@ const MatchItem = ({ match, isInPlay, createBetHandler, buttonsReady, getOddButt
                             </div>
                         </div>
                         <div className="flex items-center flex-shrink-0">
-                            <div className="flex gap-1">
-                                {(() => {
+                            {!hideOdds && (
+                                <div className="flex gap-1">
+                                    {(() => {
                                     // Use live odds if available, otherwise fall back to match odds
                                     let displayOdds;
                                     if (isInPlay && match.isLive && liveOdds && (liveOdds.home || liveOdds.draw || liveOdds.away)) {
@@ -166,7 +167,8 @@ const MatchItem = ({ match, isInPlay, createBetHandler, buttonsReady, getOddButt
                                         </>
                                     );
                                 })()}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -176,7 +178,7 @@ const MatchItem = ({ match, isInPlay, createBetHandler, buttonsReady, getOddButt
 };
 
 // League Card Component
-const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
+const LeagueCard = ({ league, isInPlay = false, viewAllText = null, hideOdds = false }) => {
     const { createBetHandler } = useBetting();
     const [buttonsReady, setButtonsReady] = useState(false);
     const isConnected = useSelector(selectIsConnected);
@@ -270,14 +272,16 @@ const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
                 </div>
             </div>
             {/* Odds Header */}
-            <div className="flex items-center px-4 py-2 bg-gray-100 border-b border-gray-200 flex-shrink-0">
-                <div className="flex-1 text-xs">{isInPlay ? 'Today' : 'Match'}</div>
-                <div className="flex gap-1">
-                    <div className="w-14 text-center text-xs text-gray-600 font-medium">1</div>
-                    <div className="w-14 text-center text-xs text-gray-600 font-medium">X</div>
-                    <div className="w-14 text-center text-xs text-gray-600 font-medium">2</div>
+            {!hideOdds && (
+                <div className="flex items-center px-4 py-2 bg-gray-100 border-b border-gray-200 flex-shrink-0">
+                    <div className="flex-1 text-xs">{isInPlay ? 'Today' : 'Match'}</div>
+                    <div className="flex gap-1">
+                        <div className="w-14 text-center text-xs text-gray-600 font-medium">1</div>
+                        <div className="w-14 text-center text-xs text-gray-600 font-medium">X</div>
+                        <div className="w-14 text-center text-xs text-gray-600 font-medium">2</div>
+                    </div>
                 </div>
-            </div>
+            )}
             {/* Matches */}
             <div className="p-4 py-0 flex-1 overflow-y-auto">
                 {league.matches.slice(0, 4).map((match, index) => (
@@ -289,6 +293,7 @@ const LeagueCard = ({ league, isInPlay = false, viewAllText = null }) => {
                             buttonsReady={buttonsReady}
                             getOddButtonClass={getOddButtonClass}
                             isOddClickable={isOddClickable}
+                            hideOdds={hideOdds}
                         />
                         {index < Math.min(league.matches.length, 4) - 1 && (
                             <div className="border-b border-gray-300 mx-0 my-2"></div>
@@ -317,7 +322,8 @@ const LeagueCards = ({
     viewAllText = null,
     useReduxData = false,
     reduxData = [],
-    loading = false
+    loading = false,
+    hideOdds = false
 }) => {
     const scrollRef = useRef(null);
 
@@ -762,6 +768,7 @@ const LeagueCards = ({
                                 league={league}
                                 isInPlay={isInPlay}
                                 viewAllText={viewAllText}
+                                hideOdds={hideOdds}
                             />
                         </div>
                     ))}

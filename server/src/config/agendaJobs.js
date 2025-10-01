@@ -24,10 +24,14 @@ let fotmobCacheJobScheduled = false;
 // Function to schedule live odds job
 const scheduleLiveOddsJob = async () => {
   if (!liveOddsJobScheduled) {
-    console.log('[Agenda] Scheduling updateLiveOdds job...');
-    await agenda.every("1 second", "updateLiveOdds");
-    liveOddsJobScheduled = true;
-    console.log('[Agenda] updateLiveOdds job scheduled successfully');
+    try {
+      console.log('[Agenda] Scheduling updateLiveOdds job...');
+      await agenda.every("1 second", "updateLiveOdds");
+      liveOddsJobScheduled = true;
+      console.log('[Agenda] updateLiveOdds job scheduled successfully');
+    } catch (error) {
+      console.error('[Agenda] Failed to schedule updateLiveOdds job:', error);
+    }
   }
 };
 

@@ -217,7 +217,7 @@ const MatchDetailPage = ({ matchId }) => {
             // Convert betOffers to betting_data format for compatibility
             betting_data: (matchData.data?.betOffers || [])
                 .filter(offer => {
-                    const marketName = offer.criterion?.label || offer.betOfferType?.name;
+                    const marketName = offer.criterion?.label || offer.criterion?.englishLabel || offer.betOfferType?.name;
                     const isImplemented = isMarketImplemented(marketName);
                     if (!isImplemented) {
                         console.log(`🚫 Main: Filtering out non-implemented market: "${marketName}"`);
@@ -228,7 +228,7 @@ const MatchDetailPage = ({ matchId }) => {
                 })
                 .map(offer => ({
                     id: offer.id,
-                    name: offer.criterion?.label || offer.betOfferType?.name,
+                    name: offer.criterion?.label || offer.criterion?.englishLabel || offer.betOfferType?.name,
                     outcomes: (offer.outcomes || []).map(outcome => ({
                         id: outcome.id,
                         name: outcome.label,
@@ -253,7 +253,7 @@ const MatchDetailPage = ({ matchId }) => {
             console.log('⚠️ Fallback: Processing raw betOffers directly');
             bettingData = matchData.data.betOffers
                 .filter(offer => {
-                    const marketName = offer.criterion?.label || offer.betOfferType?.name;
+                    const marketName = offer.criterion?.label || offer.criterion?.englishLabel || offer.betOfferType?.name;
                     const isImplemented = isMarketImplemented(marketName);
                     if (!isImplemented) {
                         console.log(`🚫 Fallback: Filtering out non-implemented market: "${marketName}"`);
@@ -264,7 +264,7 @@ const MatchDetailPage = ({ matchId }) => {
                 })
                 .map(offer => ({
                     id: offer.id,
-                    name: offer.criterion?.label || offer.betOfferType?.name,
+                    name: offer.criterion?.label || offer.criterion?.englishLabel || offer.betOfferType?.name,
                     outcomes: (offer.outcomes || []).map(outcome => ({
                         id: outcome.id,
                         name: outcome.label,
@@ -448,6 +448,8 @@ const IMPLEMENTED_MARKETS = [
     'full time result',
     'Match Regular Time',
     'Match (regular time)',
+    'full time',
+    
     'Correct score',
     'total goals odd even',
     'Draw no bet',
@@ -460,6 +462,7 @@ const IMPLEMENTED_MARKETS = [
     'Asian line (1-0)',
     'Cards 3-Way Line',
     '3-Way Line',
+    '3-Way Handicap',
     'total corners by team',
     'total corners',
     'most corners',
@@ -471,9 +474,9 @@ const IMPLEMENTED_MARKETS = [
     'most cards',
     'red card given',
     'most red cards',
-    'player shot',
-    'to score team member',
-    'to score atleat 2 goals team member',
+    'player\'s shots on target',
+    'To score',
+    'To score atleat 2 goals',
     '2nd Half',
     'exact winning margin',
     'total goals',
@@ -482,7 +485,8 @@ const IMPLEMENTED_MARKETS = [
     'Draw no bet 2nd half',
     'Both Teams To Score',
     '1st Half Total Goals',
-    '2nd Half Total Goals'
+    'Total Goals - 1st Half',
+    'Total Goals - 2nd Half',
 ];
 
 // Helper function to check if a market is implemented
@@ -493,6 +497,11 @@ function isMarketImplemented(marketName) {
     if (name.includes('double chance') && name.includes('1st half')) return false;
     if (name.includes('double chance') && name.includes('2nd half')) return false;
     if (name.includes('total corner') && name.includes('1st half')) return false;
+    if (name.includes('to score or assist')) return false;
+    if (name.includes('to score at least 3 goals')) return false;
+    if (name.includes('to score from a header')) return false;
+    if (name.includes('to score from a header')) return false;
+    if (name.includes('to score from outside the penalty box')) return false;
     
     // Check for exact matches first
     for (const implementedMarket of IMPLEMENTED_MARKETS) {
@@ -507,7 +516,9 @@ function isMarketImplemented(marketName) {
     // Special cases for flexible matching
     if (name.includes('double chance')) return true;
     if (name.includes('half time') && name.includes('full time')) return true;
-    if (name.includes('total goals by team') && !name.includes('2nd half') && !name.includes('30:00-59:59')) return true;
+    if (name.includes('total goals by') && !name.includes('2nd half') && !name.includes('30:00-59:59')) return true;
+    if (name.includes('total goals by') && !name.includes('1st half') && !name.includes('30:00-59:59')) return true;
+    if (name.includes('total goals by') ) return true;
     if (name.includes('full time result') || name.includes('match result')) return true;
     if (name.includes('match regular time') || name.includes('regular time') || name.includes('match (regular time)')) return true;
     if (name.includes('correct score')) return true;
@@ -533,16 +544,17 @@ function isMarketImplemented(marketName) {
     if (name.includes('most corners') && name.includes('50:00-59:59')) return true;
     if (name.includes('team given a red card')) return true;
     if (name.includes('to get a card')) return true;
+    if (name.includes('to get a red card')) return true;
     if (name.includes('most cards')) return true;
     if (name.includes('red card given')) return true;
     if (name.includes('most red cards')) return true;
-    if (name.includes('player shot')) return true;
-    if (name.includes('to score team member')) return true;
+    if (name.includes('player\'s shots on target')) return true;
+    if (name.includes('to score')) return true;
     if (name.includes('to score') && name.includes('at least 2 goals') && name.includes('team member')) return true;
     if (name.includes('2nd half') && !name.includes('draw no bet') && !name.includes('total goals')) return true;
     if (name.includes('exact winning margin')) return true;
     if (name.includes('total cards') && !name.includes('team')) return true;
-    if (name.includes('total cards team')) return true;
+    if (name.includes('total cards')) return true;
     if (name.includes('draw no bet') && name.includes('2nd half')) return true;
     
     return false;

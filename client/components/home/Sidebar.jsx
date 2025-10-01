@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import {  ChevronRight, Pin, Users, Settings, DollarSign, X, Search, Globe, TrendingUp, Trophy } from 'lucide-react';
+import {  ChevronRight, Pin, Users, Settings, DollarSign, X, Search, Globe, TrendingUp, Trophy, Flag } from 'lucide-react';
 import { useCustomSidebar } from '../../contexts/SidebarContext.js';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectUser } from '@/lib/features/auth/authSlice';
@@ -41,6 +41,241 @@ const Sidebar = () => {
     const [search, setSearch] = useState('');
     const [expandedCountries, setExpandedCountries] = useState({}); // All collapsed by default
 
+    // Function to check if a league is international
+    const isInternationalLeague = (leagueName) => {
+        const internationalKeywords = [
+            'champions league',
+            'europa league', 
+            'afc champions league',
+            'afc champions league 2',
+            'african nations cup',
+            'caf champions league',
+            'conference league',
+            'copa libertadores',
+            'copa sudamericana',
+            'international friendly',
+            'world cup',
+            'world cup qualifying',
+            'europa league qualification',
+            'champions league qualification',
+            'conference league qualification'
+        ];
+        
+        return internationalKeywords.some(keyword => 
+            leagueName.toLowerCase().includes(keyword.toLowerCase())
+        );
+    };
+
+    // Country flag mapping - using country codes for flag images
+    const getCountryFlag = (countryName) => {
+        const flagMap = {
+            'Argentina': 'AR',
+            'Austria': 'AT',
+            'Belgium': 'BE',
+            'Bosnia-Herzegovina': 'BA',
+            'Brazil': 'BR',
+            'Chile': 'CL',
+            'China': 'CN',
+            'Colombia': 'CO',
+            'Croatia': 'HR',
+            'Czech Republic': 'CZ',
+            'Denmark': 'DK',
+            'England': 'GB',
+            'France': 'FR',
+            'Germany': 'DE',
+            'Italy': 'IT',
+            'Japan': 'JP',
+            'Mexico': 'MX',
+            'Netherlands': 'NL',
+            'Norway': 'NO',
+            'Poland': 'PL',
+            'Portugal': 'PT',
+            'Russia': 'RU',
+            'Scotland': 'GB',
+            'Spain': 'ES',
+            'Sweden': 'SE',
+            'Switzerland': 'CH',
+            'Turkey': 'TR',
+            'Ukraine': 'UA',
+            'United States': 'US',
+            'Wales': 'GB',
+            'Australia': 'AU',
+            'Canada': 'CA',
+            'South Korea': 'KR',
+            'Greece': 'GR',
+            'Israel': 'IL',
+            'Romania': 'RO',
+            'Bulgaria': 'BG',
+            'Hungary': 'HU',
+            'Slovakia': 'SK',
+            'Slovenia': 'SI',
+            'Serbia': 'RS',
+            'Montenegro': 'ME',
+            'Albania': 'AL',
+            'North Macedonia': 'MK',
+            'Moldova': 'MD',
+            'Estonia': 'EE',
+            'Latvia': 'LV',
+            'Lithuania': 'LT',
+            'Finland': 'FI',
+            'Iceland': 'IS',
+            'Ireland': 'IE',
+            'Northern Ireland': 'GB',
+            'Malta': 'MT',
+            'Cyprus': 'CY',
+            'Luxembourg': 'LU',
+            'Liechtenstein': 'LI',
+            'Monaco': 'MC',
+            'San Marino': 'SM',
+            'Vatican City': 'VA',
+            'Andorra': 'AD',
+            'South Africa': 'ZA',
+            'Egypt': 'EG',
+            'Nigeria': 'NG',
+            'Morocco': 'MA',
+            'Tunisia': 'TN',
+            'Algeria': 'DZ',
+            'Ghana': 'GH',
+            'Senegal': 'SN',
+            'Ivory Coast': 'CI',
+            'Cameroon': 'CM',
+            'Kenya': 'KE',
+            'Ethiopia': 'ET',
+            'Uganda': 'UG',
+            'Tanzania': 'TZ',
+            'Zimbabwe': 'ZW',
+            'Zambia': 'ZM',
+            'Botswana': 'BW',
+            'Namibia': 'NA',
+            'Lesotho': 'LS',
+            'Swaziland': 'SZ',
+            'Malawi': 'MW',
+            'Mozambique': 'MZ',
+            'Madagascar': 'MG',
+            'Mauritius': 'MU',
+            'Seychelles': 'SC',
+            'Comoros': 'KM',
+            'Djibouti': 'DJ',
+            'Somalia': 'SO',
+            'Eritrea': 'ER',
+            'Sudan': 'SD',
+            'South Sudan': 'SS',
+            'Central African Republic': 'CF',
+            'Chad': 'TD',
+            'Niger': 'NE',
+            'Mali': 'ML',
+            'Burkina Faso': 'BF',
+            'Guinea': 'GN',
+            'Sierra Leone': 'SL',
+            'Liberia': 'LR',
+            'Guinea-Bissau': 'GW',
+            'Cape Verde': 'CV',
+            'São Tomé and Príncipe': 'ST',
+            'Equatorial Guinea': 'GQ',
+            'Gabon': 'GA',
+            'Republic of the Congo': 'CG',
+            'Democratic Republic of the Congo': 'CD',
+            'Angola': 'AO',
+            'Rwanda': 'RW',
+            'Burundi': 'BI',
+            'Saudi Arabia': 'SA',
+            'United Arab Emirates': 'AE',
+            'Qatar': 'QA',
+            'Kuwait': 'KW',
+            'Bahrain': 'BH',
+            'Oman': 'OM',
+            'Yemen': 'YE',
+            'Iraq': 'IQ',
+            'Syria': 'SY',
+            'Lebanon': 'LB',
+            'Jordan': 'JO',
+            'Palestine': 'PS',
+            'Iran': 'IR',
+            'Afghanistan': 'AF',
+            'Pakistan': 'PK',
+            'India': 'IN',
+            'Bangladesh': 'BD',
+            'Sri Lanka': 'LK',
+            'Maldives': 'MV',
+            'Nepal': 'NP',
+            'Bhutan': 'BT',
+            'Myanmar': 'MM',
+            'Thailand': 'TH',
+            'Laos': 'LA',
+            'Cambodia': 'KH',
+            'Vietnam': 'VN',
+            'Malaysia': 'MY',
+            'Singapore': 'SG',
+            'Indonesia': 'ID',
+            'Philippines': 'PH',
+            'Brunei': 'BN',
+            'East Timor': 'TL',
+            'Papua New Guinea': 'PG',
+            'Fiji': 'FJ',
+            'Samoa': 'WS',
+            'Tonga': 'TO',
+            'Vanuatu': 'VU',
+            'Solomon Islands': 'SB',
+            'New Zealand': 'NZ',
+            'Peru': 'PE',
+            'Ecuador': 'EC',
+            'Venezuela': 'VE',
+            'Guyana': 'GY',
+            'Suriname': 'SR',
+            'French Guiana': 'GF',
+            'Uruguay': 'UY',
+            'Paraguay': 'PY',
+            'Bolivia': 'BO',
+            'Panama': 'PA',
+            'Costa Rica': 'CR',
+            'Nicaragua': 'NI',
+            'Honduras': 'HN',
+            'El Salvador': 'SV',
+            'Guatemala': 'GT',
+            'Belize': 'BZ',
+            'Jamaica': 'JM',
+            'Haiti': 'HT',
+            'Dominican Republic': 'DO',
+            'Cuba': 'CU',
+            'Puerto Rico': 'PR',
+            'Trinidad and Tobago': 'TT',
+            'Barbados': 'BB',
+            'Saint Lucia': 'LC',
+            'Saint Vincent and the Grenadines': 'VC',
+            'Grenada': 'GD',
+            'Antigua and Barbuda': 'AG',
+            'Saint Kitts and Nevis': 'KN',
+            'Dominica': 'DM',
+            'Bahamas': 'BS',
+            'Cayman Islands': 'KY',
+            'Bermuda': 'BM',
+            'Turks and Caicos Islands': 'TC',
+            'British Virgin Islands': 'VG',
+            'US Virgin Islands': 'VI',
+            'Anguilla': 'AI',
+            'Montserrat': 'MS',
+            'Saint Pierre and Miquelon': 'PM',
+            'Greenland': 'GL',
+            'Faroe Islands': 'FO',
+            'Åland Islands': 'AX',
+            'Svalbard and Jan Mayen': 'SJ',
+            'Bouvet Island': 'BV',
+            'Heard Island and McDonald Islands': 'HM',
+            'French Southern Territories': 'TF',
+            'South Georgia and the South Sandwich Islands': 'GS',
+            'Antarctica': 'AQ',
+            'British Antarctic Territory': 'AQ',
+            'Ross Dependency': 'AQ',
+            'Adélie Land': 'AQ',
+            'Queen Maud Land': 'AQ',
+            'Australian Antarctic Territory': 'AQ',
+            'Chilean Antarctic Territory': 'AQ',
+            'Peter I Island': 'AQ'
+        };
+        
+        return flagMap[countryName] || 'UN';
+    };
+
     // Group leagues by country and filter by search
     const groupedLeagues = useMemo(() => {
         if (!popularLeagues || !Array.isArray(popularLeagues)) return {};
@@ -49,18 +284,22 @@ const Sidebar = () => {
             : popularLeagues;
         const groups = {};
         filtered.forEach(league => {
-            // Normalize country id and name for 'Other' group
-            let countryId = league.country?.id;
-            let countryName = league.country?.official_name || league.country?.name;
-            if (!countryId || countryId === 'other' || countryName === undefined || countryName === null || countryName === '') {
-                countryId = 'other';
+            // Get country name from the league data
+            let countryName = league.country?.name || league.country?.official_name;
+            
+            // If no country name or empty, put in 'other' group
+            if (!countryName || countryName.trim() === '') {
                 countryName = 'Other';
             }
+            
+            // Use country name as the key (normalized)
+            const countryId = countryName.toLowerCase().replace(/\s+/g, '-');
+            
             if (!groups[countryId]) {
                 groups[countryId] = {
                     name: countryName,
                     id: countryId,
-                    flag: league.country?.image_path,
+                    flag: league.country?.image_path || league.country?.image,
                     leagues: []
                 };
             }
@@ -71,12 +310,19 @@ const Sidebar = () => {
 
     // Get sorted country keys (alphabetical by country name)
     const sortedCountryKeys = useMemo(() => {
-        return Object.keys(groupedLeagues).sort((a, b) => {
+        const keys = Object.keys(groupedLeagues).sort((a, b) => {
             const nameA = groupedLeagues[a].name || '';
             const nameB = groupedLeagues[b].name || '';
             return nameA.localeCompare(nameB);
         });
-    }, [groupedLeagues]);
+        
+        // Debug logging
+        console.log('🔍 Grouped leagues:', groupedLeagues);
+        console.log('🔍 Sorted country keys:', keys);
+        console.log('🔍 Popular leagues sample:', popularLeagues?.slice(0, 3));
+        
+        return keys;
+    }, [groupedLeagues, popularLeagues]);
 
 
 
@@ -235,7 +481,6 @@ const Sidebar = () => {
                                         <TrendingUp className="mr-1 h-4 w-4" /> Popular
                                     </TabsTrigger>
 
-
                                     <TabsTrigger
                                         value="by-country"
                                         className="flex-1 text-xs bg-transparent cursor-pointer text-white data-[state=active]:bg-base data-[state=active]:text-white"
@@ -315,32 +560,29 @@ const Sidebar = () => {
                                                     })
                                                 )
                                             ) : (
-                                                sortedCountryKeys.map((countryId, idx) => {
-                                                    const country = groupedLeagues[countryId];
-                                                    const isExpanded = expandedCountries[countryId] ?? false;
-                                                    return (
-                                                        <div key={countryId} className="mb-2">
-                                                            {idx > 0 && <div className="border-t border-gray-700 my-2" />}
-                                                            <div
-                                                                className="flex items-center justify-between py-1 px-2 bg-gray-700 rounded cursor-pointer select-none transition-colors hover:bg-gray-600 group"
-                                                                onClick={() => setExpandedCountries(prev => ({ ...prev, [countryId]: !isExpanded }))}
-                                                                tabIndex={0}
-                                                                role="button"
-                                                                aria-expanded={isExpanded}
-                                                            >
-                                                                <div className="flex items-center">
-                                                                    {country.flag && (
-                                                                        <img src={country.flag} alt={country.name} className="w-5 h-5 mr-2 object-contain rounded-full border border-gray-600" />
-                                                                    )}
-                                                                    <span className="font-semibold text-xs truncate max-w-[120px]" title={country.name}>
-                                                                        {country.name}
-                                                                    </span>
-                                                                </div>
-                                                                <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                                                <>
+                                                    {/* International Leagues Accordion */}
+                                                    <div className="mb-3">
+                                                        <div
+                                                            className="flex items-center justify-between py-1 px-2 bg-gray-700 rounded cursor-pointer select-none transition-colors hover:bg-gray-600 group"
+                                                            onClick={() => setExpandedCountries(prev => ({ ...prev, 'international': !expandedCountries['international'] }))}
+                                                            tabIndex={0}
+                                                            role="button"
+                                                            aria-expanded={expandedCountries['international']}
+                                                        >
+                                                            <div className="flex items-center">
+                                                                <Globe className="w-4 h-4 mr-2 text-blue-400" />
+                                                                <span className="font-semibold text-xs truncate max-w-[120px]" title="International">
+                                                                    International
+                                                                </span>
                                                             </div>
-                                                            {isExpanded && (
-                                                                <div>
-                                                                    {country.leagues.map(league => {
+                                                            <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${expandedCountries['international'] ? 'rotate-90' : ''}`} />
+                                                        </div>
+                                                        {expandedCountries['international'] && (
+                                                            <div className="mt-2">
+                                                                {popularLeagues
+                                                                    ?.filter(league => isInternationalLeague(league.name))
+                                                                    ?.map(league => {
                                                                         const leagueHref = league.id === 'odds-boost' ? '/' : `/leagues/${league.id}`;
                                                                         return (
                                                                             <Link
@@ -349,7 +591,144 @@ const Sidebar = () => {
                                                                                 className="flex items-center justify-between py-1 px-5 rounded cursor-pointer group transition-colors hover:bg-gray-700 focus:bg-gray-700 border-l-2 border-transparent hover:border-blue-400 mt-1 focus:border-blue-400 w-[95%] mx-auto"
                                                                                 title={league.name}
                                                                             >
-                                                                                <div className="flex items-center min-w-0 py-0 ">
+                                                                                <div className="flex items-center min-w-0 py-0">
+                                                                                    {league.image_path ? (
+                                                                                        <span className="bg-white rounded-full border border-gray-200 flex items-center justify-center w-6 h-6 mr-2">
+                                                                                            <img
+                                                                                                src={league.image_path}
+                                                                                                alt={league.name}
+                                                                                                className="w-5 h-5 object-contain"
+                                                                                                onError={e => { e.target.style.display = 'none'; }}
+                                                                                            />
+                                                                                        </span>
+                                                                                    ) : league.icon ? (
+                                                                                        <span className="text-green-400 text-sm mr-2">{league.icon}</span>
+                                                                                    ) : null}
+                                                                                    <span className="text-xs truncate max-w-[120px]" title={league.name}>{league.name}</span>
+                                                                                </div>
+                                                                            </Link>
+                                                                        );
+                                                                    })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {/* Country Groups - Filter out 'other' and international leagues */}
+                                                    {sortedCountryKeys
+                                                        .filter(countryId => {
+                                                            const country = groupedLeagues[countryId];
+                                                            // Exclude 'other' group
+                                                            if (countryId === 'other' || country.name === 'Other') return false;
+                                                            
+                                                            // Check if all leagues in this country are international
+                                                            const hasNonInternationalLeagues = country.leagues.some(league => 
+                                                                !isInternationalLeague(league.name)
+                                                            );
+                                                            
+                                                            console.log(`🔍 Country ${country.name}: hasNonInternationalLeagues = ${hasNonInternationalLeagues}, leagues count = ${country.leagues.length}`);
+                                                            
+                                                            return hasNonInternationalLeagues;
+                                                        })
+                                                        .map((countryId, idx) => {
+                                                        const country = groupedLeagues[countryId];
+                                                        const isExpanded = expandedCountries[countryId] ?? false;
+                                                        return (
+                                                            <div key={countryId} className="mb-2">
+                                                                <div
+                                                                    className="flex items-center justify-between py-1 px-2 bg-gray-700 rounded cursor-pointer select-none transition-colors hover:bg-gray-600 group"
+                                                                    onClick={() => setExpandedCountries(prev => ({ ...prev, [countryId]: !isExpanded }))}
+                                                                    tabIndex={0}
+                                                                    role="button"
+                                                                    aria-expanded={isExpanded}
+                                                                >
+                                                                    <div className="flex items-center">
+                                                                        <img 
+                                                                            src={`https://flagcdn.com/w20/${getCountryFlag(country.name).toLowerCase()}.png`}
+                                                                            alt={country.name}
+                                                                            className="w-5 h-4 mr-2 object-cover rounded-sm border border-gray-600"
+                                                                            onError={(e) => {
+                                                                                e.target.style.display = 'none';
+                                                                                e.target.nextSibling.style.display = 'inline';
+                                                                            }}
+                                                                        />
+                                                                        <Flag 
+                                                                            className="w-4 h-4 mr-2 text-gray-400 hidden" 
+                                                                            style={{ display: 'none' }}
+                                                                        />
+                                                                        <span className="font-semibold text-xs truncate max-w-[120px]" title={country.name}>
+                                                                            {country.name}
+                                                                        </span>
+                                                                    </div>
+                                                                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                                                                </div>
+                                                                {isExpanded && (
+                                                                    <div>
+                                                                        {country.leagues
+                                                                            .filter(league => !isInternationalLeague(league.name)) // Only show non-international leagues
+                                                                            .map(league => {
+                                                                                const leagueHref = league.id === 'odds-boost' ? '/' : `/leagues/${league.id}`;
+                                                                                return (
+                                                                                    <Link
+                                                                                        key={league.id}
+                                                                                        href={leagueHref}
+                                                                                        className="flex items-center justify-between py-1 px-5 rounded cursor-pointer group transition-colors hover:bg-gray-700 focus:bg-gray-700 border-l-2 border-transparent hover:border-blue-400 mt-1 focus:border-blue-400 w-[95%] mx-auto"
+                                                                                        title={league.name}
+                                                                                    >
+                                                                                        <div className="flex items-center min-w-0 py-0">
+                                                                                            {league.image_path ? (
+                                                                                                <span className="bg-white rounded-full border border-gray-200 flex items-center justify-center w-6 h-6 mr-2">
+                                                                                                    <img
+                                                                                                        src={league.image_path}
+                                                                                                        alt={league.name}
+                                                                                                        className="w-5 h-5 object-contain"
+                                                                                                        onError={e => { e.target.style.display = 'none'; }}
+                                                                                                    />
+                                                                                                </span>
+                                                                                            ) : league.icon ? (
+                                                                                                <span className="text-green-400 text-sm mr-2">{league.icon}</span>
+                                                                                            ) : null}
+                                                                                            <span className="text-xs truncate max-w-[120px]" title={league.name}>{league.name}</span>
+                                                                                        </div>
+                                                                                    </Link>
+                                                                                );
+                                                                            })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    
+                                                    {/* Other Leagues Accordion - for leagues without proper country data */}
+                                                    {groupedLeagues['other'] && groupedLeagues['other'].leagues.length > 0 && (
+                                                        <div className="mb-2">
+                                                            <div className="border-t border-gray-700 my-2" />
+                                                            <div
+                                                                className="flex items-center justify-between py-1 px-2 bg-gray-700 rounded cursor-pointer select-none transition-colors hover:bg-gray-600 group"
+                                                                onClick={() => setExpandedCountries(prev => ({ ...prev, 'other': !expandedCountries['other'] }))}
+                                                                tabIndex={0}
+                                                                role="button"
+                                                                aria-expanded={expandedCountries['other']}
+                                                            >
+                                                                <div className="flex items-center">
+                                                                    <Trophy className="w-4 h-4 mr-2 text-gray-400" />
+                                                                    <span className="font-semibold text-xs truncate max-w-[120px]" title="Other">
+                                                                        Other
+                                                                    </span>
+                                                                </div>
+                                                                <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${expandedCountries['other'] ? 'rotate-90' : ''}`} />
+                                                            </div>
+                                                            {expandedCountries['other'] && (
+                                                                <div>
+                                                                    {groupedLeagues['other'].leagues.map(league => {
+                                                                        const leagueHref = league.id === 'odds-boost' ? '/' : `/leagues/${league.id}`;
+                                                                        return (
+                                                                            <Link
+                                                                                key={league.id}
+                                                                                href={leagueHref}
+                                                                                className="flex items-center justify-between py-1 px-5 rounded cursor-pointer group transition-colors hover:bg-gray-700 focus:bg-gray-700 border-l-2 border-transparent hover:border-blue-400 mt-1 focus:border-blue-400 w-[95%] mx-auto"
+                                                                                title={league.name}
+                                                                            >
+                                                                                <div className="flex items-center min-w-0 py-0">
                                                                                     {league.image_path ? (
                                                                                         <span className="bg-white rounded-full border border-gray-200 flex items-center justify-center w-6 h-6 mr-2">
                                                                                             <img
@@ -370,8 +749,8 @@ const Sidebar = () => {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    );
-                                                })
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     )}

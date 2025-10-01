@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import TopPicks from './TopPicks';
 import LiveMatches from './LiveMatches';
 import LeagueCards from './LeagueCards';
 import { fetchHomepageData, selectHomeLoading, selectHomeError, selectFootballDaily } from '@/lib/features/home/homeSlice';
-import { fetchLiveMatches, selectLiveMatches, selectUpcomingMatchesGrouped } from '@/lib/features/matches/liveMatchesSlice';
+import { fetchLiveMatches, silentUpdateLiveMatches, selectLiveMatches, selectUpcomingMatchesGrouped } from '@/lib/features/matches/liveMatchesSlice';
 
 const HomePage = () => {
     const dispatch = useDispatch();
@@ -22,12 +22,70 @@ const HomePage = () => {
     const liveMatches = useSelector(selectLiveMatches);
     // Upcoming matches state from Unibet API (filtered by CSV leagues)
     const upcomingMatches = useSelector(selectUpcomingMatchesGrouped);
+    
+    // Ref for polling interval
+    const pollingIntervalRef = useRef(null);
 
+    // Initial data fetch
     useEffect(() => {
         // Fetch homepage data when component mounts
         dispatch(fetchHomepageData());
         // Fetch live matches from Unibet API
         dispatch(fetchLiveMatches());
+    }, [dispatch]);
+
+    // Set up polling for live matches data (5 seconds)
+    useEffect(() => {
+        // Start polling every 5 seconds for live matches
+        const startPolling = () => {
+            pollingIntervalRef.current = setInterval(() => {
+                console.log('🔄 Home page polling live matches data...');
+                dispatch(silentUpdateLiveMatches());
+            }, 5000); // Poll every 5 seconds
+        };
+
+        // Start polling after initial load
+        const timeoutId = setTimeout(() => {
+            startPolling();
+        }, 2000); // Wait 2 seconds after initial load
+
+        // Cleanup function
+        return () => {
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+            }
+            clearTimeout(timeoutId);
+        };
+    }, [dispatch]);
+
+    // Pause polling when tab is not visible (performance optimization)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // Pause polling when tab is hidden
+                if (pollingIntervalRef.current) {
+                    clearInterval(pollingIntervalRef.current);
+                    pollingIntervalRef.current = null;
+                    console.log('⏸️ Home page polling paused - tab not visible');
+                }
+            } else {
+                // Resume polling when tab becomes visible
+                if (!pollingIntervalRef.current) {
+                    pollingIntervalRef.current = setInterval(() => {
+                        console.log('🔄 Home page resuming live matches polling...');
+                        dispatch(silentUpdateLiveMatches());
+                    }, 5000);
+                    console.log('▶️ Home page polling resumed - tab visible');
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [dispatch]);
 
 
@@ -89,6 +147,7 @@ const HomePage = () => {
                             useReduxData={true}
                             reduxData={liveMatches}
                             loading={false}
+                            hideOdds={true}
                         />
                     </div>
 

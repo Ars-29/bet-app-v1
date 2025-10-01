@@ -190,8 +190,17 @@ export default class BetOutcomeCalculator {
             if (fs.existsSync(cacheFile)) {
                 console.log(`✅ DAILY CACHE FOUND: Loading ${path.basename(cacheFile)}`);
                 const data = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-                console.log(`   - Leagues in daily cache: ${data.leagues?.length || 0}`);
-                return data;
+                // Handle Fotmob API format change - leagues might be returned as array directly
+                if (Array.isArray(data)) {
+                    console.log(`   - Leagues in daily cache: ${data.length} (array format)`);
+                    return { leagues: data };
+                } else if (data.leagues) {
+                    console.log(`   - Leagues in daily cache: ${data.leagues.length} (object format)`);
+                    return data;
+                } else {
+                    console.log(`❌ Unexpected cached data format`);
+                    return null;
+                }
             } else {
                 console.log(`❌ Daily cache not found: ${path.basename(cacheFile)}`);
             }
@@ -225,14 +234,26 @@ export default class BetOutcomeCalculator {
             if (fs.existsSync(multiDayCacheFile)) {
                 console.log(`✅ MULTI-DAY CACHE FOUND: Loading ${path.basename(multiDayCacheFile)}`);
                 const data = JSON.parse(fs.readFileSync(multiDayCacheFile, 'utf8'));
-                console.log(`   - Total leagues in multi-day cache: ${data.leagues?.length || 0}`);
+                
+                // Handle Fotmob API format change - leagues might be returned as array directly
+                let leaguesData;
+                if (Array.isArray(data)) {
+                    console.log(`   - Total leagues in multi-day cache: ${data.length} (array format)`);
+                    leaguesData = { leagues: data };
+                } else if (data.leagues) {
+                    console.log(`   - Total leagues in multi-day cache: ${data.leagues.length} (object format)`);
+                    leaguesData = data;
+                } else {
+                    console.log(`❌ Unexpected multi-day cached data format`);
+                    return null;
+                }
 
                 // For test event, use August 11, 2025 data; otherwise filter by actual date
                 const filterDate = useTestDate ? '2025-08-11' : dateFormatted;
                 console.log(`   - Filtering matches for date: ${filterDate} ${useTestDate ? '(TEST MODE)' : ''}`);
                 
                 let matchesForDate = 0;
-                const filteredLeagues = data.leagues.map(league => {
+                const filteredLeagues = leaguesData.leagues.map(league => {
                     const filteredMatches = (league.matches || []).filter(match => {
                         const matchDate = new Date(match.status?.utcTime || match.time);
                         const matchDateStr = matchDate.toISOString().slice(0, 10);
@@ -262,13 +283,25 @@ export default class BetOutcomeCalculator {
             // Fallback: fetch fresh data
             console.log(`📡 FALLBACK: Fetching fresh Fotmob data for ${dateStr}`);
             try {
-            const freshData = await this.fotmob.getMatchesByDate(dateStr);
+            // Create a fresh Fotmob instance to avoid state corruption
+            const fotmob = new Fotmob();
+            const freshData = await fotmob.getMatchesByDate(dateStr);
             if (freshData) {
-                console.log(`✅ Fresh data fetched: ${freshData.leagues?.length || 0} leagues`);
+                // Handle Fotmob API format change - leagues might be returned as array directly
+                if (Array.isArray(freshData)) {
+                    console.log(`✅ Fresh data fetched: ${freshData.length} leagues (array format)`);
+                    return { leagues: freshData };
+                } else if (freshData.leagues) {
+                    console.log(`✅ Fresh data fetched: ${freshData.leagues.length} leagues (object format)`);
+                    return freshData;
+                } else {
+                    console.log(`❌ Unexpected Fotmob data format`);
+                    return null;
+                }
             } else {
                 console.log(`❌ Failed to fetch fresh data`);
+                return null;
             }
-            return freshData;
             } catch (fotmobError) {
                 console.error(`❌ FOTMOB API ERROR:`, fotmobError.message);
                 
@@ -447,7 +480,41 @@ export default class BetOutcomeCalculator {
             fotmobLeague = fotmobData.leagues.find(league => league.primaryId === fotmobLeagueId);
         }
 
+        // If exact ID not found, try to find leagues with similar names (for group leagues)
         if (!fotmobLeague) {
+            console.log(`🔍 Exact league ID ${fotmobLeagueId} not found, searching for similar league names...`);
+            const similarLeagues = fotmobData.leagues.filter(league => {
+                const leagueName = league.name.toLowerCase();
+                const fotmobName = leagueMapping.fotmobName.toLowerCase();
+                
+                // Check if the league name contains the Fotmob name or vice versa
+                return leagueName.includes(fotmobName) || fotmobName.includes(leagueName) ||
+                       leagueName.includes('champions league two') || // For AFC Champions League Two groups
+                       leagueName.includes('champions league 2');
+            });
+
+            if (similarLeagues.length > 0) {
+                console.log(`📋 Found ${similarLeagues.length} similar leagues:`);
+                similarLeagues.forEach(league => {
+                    console.log(`   - ${league.name}: id=${league.id}, primaryId=${league.primaryId}, matches=${league.matches?.length || 0}`);
+                });
+                
+                // Instead of picking one league, we'll search through ALL similar leagues
+                // This will be handled in the match finding logic below
+                console.log(`🔍 Will search through all ${similarLeagues.length} similar leagues for matches`);
+            }
+        }
+
+        // Check if we have any matches to search through (either exact league or similar leagues)
+        const hasMatchesToSearch = fotmobLeague || (fotmobData.leagues.some(league => {
+            const leagueName = league.name.toLowerCase();
+            const fotmobName = leagueMapping.fotmobName.toLowerCase();
+            return leagueName.includes(fotmobName) || fotmobName.includes(leagueName) ||
+                   leagueName.includes('champions league two') ||
+                   leagueName.includes('champions league 2');
+        }));
+
+        if (!hasMatchesToSearch) {
             console.log(`❌ FOTMOB LEAGUE NOT FOUND: ${fotmobLeagueId} not in daily data`);
             console.log(`📋 Searched both 'id' and 'primaryId' fields`);
             console.log(`📋 This means the league matches are not in the Fotmob cache for this date`);
@@ -472,12 +539,6 @@ export default class BetOutcomeCalculator {
             return matchingResult;
         }
 
-        console.log(`✅ FOTMOB LEAGUE FOUND:`);
-        console.log(`   - League: ${fotmobLeague.name} (ID: ${fotmobLeague.id})`);
-        console.log(`   - Matches available: ${fotmobLeague.matches?.length || 0}`);
-
-        matchingResult.debugInfo.searchSteps.push(`✅ Fotmob league found: ${fotmobLeague.name} with ${fotmobLeague.matches?.length || 0} matches`);
-
         // Step 4: Validate bet has required team names
         if (!bet.homeName || !bet.awayName) {
             matchingResult.error = 'Bet missing team names';
@@ -496,13 +557,36 @@ export default class BetOutcomeCalculator {
         
         let bestMatch = null;
         let bestScore = 0;
+        let allMatchesToSearch = [];
+
+        // Always search through all similar leagues, even if exact league is found
+        // This ensures we find matches in all groups (A, B, C, D, etc.)
+        console.log(`🔍 Searching through all similar leagues for comprehensive match coverage...`);
+        const similarLeagues = fotmobData.leagues.filter(league => {
+            const leagueName = league.name.toLowerCase();
+            const fotmobName = leagueMapping.fotmobName.toLowerCase();
+            
+            return leagueName.includes(fotmobName) || fotmobName.includes(leagueName) ||
+                   leagueName.includes('champions league two') ||
+                   leagueName.includes('champions league 2');
+        });
+
+        console.log(`📋 Found ${similarLeagues.length} similar leagues to search:`);
+        similarLeagues.forEach(league => {
+            console.log(`   - ${league.name}: id=${league.id}, matches=${league.matches?.length || 0}`);
+            if (league.matches && league.matches.length > 0) {
+                allMatchesToSearch.push(...league.matches);
+            }
+        });
+        console.log(`🔍 Total matches to search: ${allMatchesToSearch.length}`);
+        matchingResult.debugInfo.searchSteps.push(`✅ Searching through ${similarLeagues.length} similar leagues with ${allMatchesToSearch.length} total matches`);
 
         console.log(`🔍 DEBUGGING MATCH MATCHING:`);
         console.log(`   - Bet teams: "${bet.homeName}" vs "${bet.awayName}"`);
         console.log(`   - Bet date: ${betDate.toISOString()}`);
-        console.log(`   - Fotmob league matches count: ${fotmobLeague.matches?.length || 0}`);
+        console.log(`   - Total matches to search: ${allMatchesToSearch.length}`);
 
-        for (const match of fotmobLeague.matches || []) {
+        for (const match of allMatchesToSearch) {
             const matchDate = new Date(match.status?.utcTime || match.time);
             const timeDiff = Math.abs(matchDate.getTime() - betDate.getTime());
             const timeWindow = 24 * 60 * 60 * 1000; // 24 hours
@@ -3139,7 +3223,9 @@ export default class BetOutcomeCalculator {
             }
 
             console.log(`📡 Fetching fresh Fotmob data for ${dateStr}`);
-            const data = await this.fotmob.getMatchesByDate(dateStr);
+            // Create a fresh Fotmob instance to avoid state corruption
+            const fotmob = new Fotmob();
+            const data = await fotmob.getMatchesByDate(dateStr);
 
             if (data) {
                 fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2));

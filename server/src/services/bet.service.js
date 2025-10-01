@@ -471,7 +471,7 @@ class BetService {
                 );
                 odds = {
                   id: outcome.id,
-                  value: outcome.odds,
+                  value: outcome.odds / 1000, // Convert from Unibet format to decimal
                   name: outcome.label,
                   market_id: matchingBetOffer.criterion?.id || matchingBetOffer.id,
                   label: outcome.label,
@@ -480,7 +480,7 @@ class BetService {
                 // Fallback: use odds from leg data (sent from frontend)
                 odds = {
                   id: leg.oddId,
-                  value: leg.odds,
+                  value: leg.odds, // Already in decimal format from frontend
                   name: leg.betOption || leg.selection,
                   market_id: leg.marketId || "unknown",
                   label: leg.betOption || leg.selection,
@@ -497,7 +497,7 @@ class BetService {
               
               odds = {
                 id: leg.oddId,
-                value: leg.odds,
+                value: leg.odds, // Already in decimal format from frontend
                 name: leg.betOption || leg.selection,
                 market_id: leg.marketId || "unknown",
                 label: leg.betOption || leg.selection,
@@ -515,7 +515,7 @@ class BetService {
             
             odds = {
               id: leg.oddId,
-              value: leg.odds,
+              value: leg.odds, // Already in decimal format from frontend
               name: leg.betOption || leg.selection,
               market_id: leg.marketId || "unknown",
               label: leg.betOption || leg.selection,
@@ -552,7 +552,7 @@ class BetService {
             homeName: leg.homeName || matchData.participants?.[0]?.name || this.extractHomeTeam(leg.teams),
             awayName: leg.awayName || matchData.participants?.[1]?.name || this.extractAwayTeam(leg.teams),
             start: leg.start || leg.matchDate || matchData.starting_at,
-            odds: parseFloat(odds.value) / 1000 // Convert from Unibet format to decimal
+            odds: parseFloat(leg.odds) // Use frontend odds (already in decimal format)
           },
           {
             eventName: leg.teams || `${matchData.participants?.[0]?.name || 'Home'} vs ${matchData.participants?.[1]?.name || 'Away'}`,
@@ -568,7 +568,7 @@ class BetService {
           matchId: leg.matchId,
           oddId: leg.oddId,
           betOption: leg.betOption || leg.selection || odds.name,
-          odds: parseFloat(odds.value), // Unibet API already returns decimal odds
+          odds: parseFloat(leg.odds), // Use frontend odds (already in decimal format)
           stake: stake, // Same stake for all legs in combination
           payout: 0,
           status: "pending",

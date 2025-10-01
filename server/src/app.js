@@ -49,6 +49,8 @@ app.use(
   cors({
     origin: [
       process.env.CLIENT_URL || "http://localhost:3000",
+      "http://69.197.164.180:3000",
+      "http://69.197.164.180",
       "https://betting-website-tau.vercel.app",
       "https://betting-website-tau.vercel.app/",
       "https://betting-app-gules.vercel.app",
@@ -190,6 +192,17 @@ liveFixturesService.setSocketIO(io);
 // Make io available to services
 app.set('io', io);
 
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  console.log('🔄 Server will continue running...');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.log('🔄 Server will continue running...');
+});
+
 // Initialize everything in proper order
 const initializeApp = async () => {
   try {
@@ -212,7 +225,8 @@ const initializeApp = async () => {
     
   } catch (error) {
     console.error('❌ Failed to initialize app:', error);
-    process.exit(1);
+    // Don't exit, just log the error and continue
+    console.log('🔄 Server will continue running without database...');
   }
 };
 

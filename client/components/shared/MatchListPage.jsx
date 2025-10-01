@@ -26,7 +26,8 @@ const MatchListPage = ({ config }) => {
         matchTimeComponent, // New prop for React component
         PageIcon,
         noMatchesConfig,
-        viewAllMatchesLink = '/'
+        viewAllMatchesLink = '/',
+        hideOdds = false
     } = config;
 
     const [leagues, setLeagues] = useState([]);
@@ -216,14 +217,16 @@ const MatchListPage = ({ config }) => {
                                         </AccordionTrigger>
                                         <AccordionContent className="px-0 pb-0">
                                             {/* Odds Header */}
-                                            <div className="flex items-center px-4 py-2 bg-gray-100 border-t border-gray-200">
-                                                <div className="flex-1 text-xs font-medium text-gray-700">Match</div>
-                                                <div className="flex gap-1 items-center">
-                                                    <div className="w-14 text-center text-xs font-medium text-gray-700">1</div>
-                                                    <div className="w-14 text-center text-xs font-medium text-gray-700">X</div>
-                                                    <div className="w-14 text-center text-xs font-medium text-gray-700">2</div>
+                                            {!hideOdds && (
+                                                <div className="flex items-center px-4 py-2 bg-gray-100 border-t border-gray-200">
+                                                    <div className="flex-1 text-xs font-medium text-gray-700">Match</div>
+                                                    <div className="flex gap-1 items-center">
+                                                        <div className="w-14 text-center text-xs font-medium text-gray-700">1</div>
+                                                        <div className="w-14 text-center text-xs font-medium text-gray-700">X</div>
+                                                        <div className="w-14 text-center text-xs font-medium text-gray-700">2</div>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Matches */}
                                             <div className="divide-y divide-gray-100">
@@ -269,8 +272,10 @@ const MatchListPage = ({ config }) => {
                                                                         </div>
                                                                         </div>
                                                                     </Link>
-                                                                </div>                                                        {/* Betting Buttons */}
-                                                                <div className="flex gap-1 ml-2 md:ml-4"> {/* Adjusted margin for responsiveness */}
+                                                                </div>
+                                                                {/* Betting Buttons */}
+                                                                {!hideOdds && (
+                                                                    <div className="flex gap-1 ml-2 md:ml-4"> {/* Adjusted margin for responsiveness */}
                                                                     {match.odds && match.odds.home && (
                                                                         <Button
                                                                             size="sm"
@@ -358,7 +363,8 @@ const MatchListPage = ({ config }) => {
                                                                             {match.odds.away.suspended ? '--' : match.odds.away.value}
                                                                         </Button>
                                                                     )}
-                                                                </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );

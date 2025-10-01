@@ -16,8 +16,31 @@ class WebSocketService {
   initialize() {
     if (this.isInitialized) return;
 
+    // Determine the WebSocket URL based on environment
+    const getWebSocketURL = () => {
+      // Check if we're in production environment
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        
+        // If accessing from production server, use production WebSocket URL
+        if (hostname === '69.197.164.180' || hostname.includes('69.197.164.180')) {
+          return 'http://69.197.164.180:4000';
+        }
+        
+        // If accessing from localhost, use localhost WebSocket URL
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          return 'http://localhost:4000';
+        }
+      }
+      
+      // Fallback to environment variable or localhost
+      return process.env.NEXT_PUBLIC_BASE_API_URL || 'http://localhost:4000';
+    };
+
+    const websocketURL = getWebSocketURL();
+
     // Create Socket.IO connection
-    this.socket = io(process.env.NEXT_PUBLIC_BASE_API_URL || 'http://localhost:4000', {
+    this.socket = io(websocketURL, {
       transports: ['websocket', 'polling'],
       withCredentials: true,
     });
@@ -45,7 +68,7 @@ class WebSocketService {
       console.error('❌ WebSocket connection error:', error);
       store.dispatch(setConnectionStatus('error'));
     });
-    console.log('🌐 WebSocket initialized with URL:', process.env.NEXT_PUBLIC_BASE_API_URL || 'http://localhost:4000');
+    console.log('🌐 WebSocket initialized with URL:', websocketURL);
     
     // Live odds updates
     this.socket.on('liveOddsUpdate', (data) => {

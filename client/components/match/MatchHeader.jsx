@@ -1,5 +1,5 @@
 "use client"
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { ChevronLeft, ChevronDown, Clock } from "lucide-react"
 import MatchDropdown from "./MatchDropdown"
 import { useRouter } from "next/navigation"
@@ -18,6 +18,67 @@ const isMatchLive = (match) => {
     }
     const matchEnd = new Date(matchTime.getTime() + 120 * 60 * 1000);
     return matchTime <= now && now < matchEnd;
+};
+
+// Live Timer Component
+const LiveTimer = ({ matchStart, isLive }) => {
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const [currentPeriod, setCurrentPeriod] = useState('1st Half');
+
+    useEffect(() => {
+        if (!isLive || !matchStart) return;
+
+        const updateTimer = () => {
+            const now = new Date();
+            let matchTime;
+            if (matchStart.includes('T')) {
+                matchTime = new Date(matchStart.endsWith('Z') ? matchStart : matchStart + 'Z');
+            } else {
+                matchTime = new Date(matchStart.replace(' ', 'T') + 'Z');
+            }
+            
+            const elapsed = Math.floor((now.getTime() - matchTime.getTime()) / 1000);
+            setElapsedTime(Math.max(0, elapsed));
+            
+            // Determine period based on elapsed time
+            if (elapsed < 45) {
+                setCurrentPeriod('1st Half');
+            } else if (elapsed < 60) {
+                setCurrentPeriod('Half Time');
+            } else if (elapsed < 105) {
+                setCurrentPeriod('2nd Half');
+            } else if (elapsed < 120) {
+                setCurrentPeriod('Added Time');
+            } else {
+                setCurrentPeriod('Full Time');
+            }
+        };
+
+        // Update immediately
+        updateTimer();
+        
+        // Update every second
+        const interval = setInterval(updateTimer, 1000);
+        
+        return () => clearInterval(interval);
+    }, [isLive, matchStart]);
+
+    if (!isLive) return null;
+
+    const minutes = Math.floor(elapsedTime / 60);
+    const seconds = elapsedTime % 60;
+    const displayTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    return (
+        <div className="space-y-1">
+            <div className="text-2xl font-bold text-red-600 animate-pulse">
+                {displayTime}
+            </div>
+            <div className="text-xs text-gray-500">
+                {currentPeriod}
+            </div>
+        </div>
+    );
 };
 
 // Utility function to parse match name and extract home and away teams
@@ -103,9 +164,18 @@ const MatchHeader = ({ matchData }) => {
                 <div className="text-sm text-gray-600 mb-2">
                     {leagueName}
                 </div>
-                <div className="flex items-center justify-center text-sm text-gray-500 mb-2">
-                    <Clock className="h-4 w-4 mr-1" />
-                    {isLive ? 'LIVE' : matchTime}
+                <div className="flex items-center justify-center text-sm mb-2">
+                    {isLive ? (
+                        <div className="flex items-center text-red-600 font-bold animate-pulse">
+                            <div className="w-2 h-2 bg-red-600 rounded-full mr-2 animate-pulse"></div>
+                            LIVE
+                        </div>
+                    ) : (
+                        <div className="flex items-center text-gray-500">
+                            <Clock className="h-4 w-4 mr-1" />
+                            {matchTime}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -120,14 +190,12 @@ const MatchHeader = ({ matchData }) => {
 
                 {/* Score/Time */}
                 <div className="flex-1 text-center">
-                    {isLive && liveData ? (
+                    {isLive ? (
                         <div className="space-y-1">
                             <div className="text-2xl font-bold text-gray-800">
                                 {score}
                             </div>
-                            <div className="text-xs text-gray-500">
-                                {period} {minute}'
-                            </div>
+                            <LiveTimer matchStart={matchData.start} isLive={isLive} />
                         </div>
                     ) : (
                         <div className="text-sm text-gray-500">

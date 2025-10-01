@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchLiveMatches, selectLiveMatchesGrouped, selectLiveMatchesLoading, selectLiveMatchesError } from '@/lib/features/matches/liveMatchesSlice';
+import { fetchLiveMatches, silentUpdateLiveMatches, selectLiveMatchesGrouped, selectLiveMatchesLoading, selectLiveMatchesError } from '@/lib/features/matches/liveMatchesSlice';
 import MatchListPage from '@/components/shared/MatchListPage';
 import LiveTimer from '@/components/home/LiveTimer';
 
@@ -12,9 +12,65 @@ const InPlayPage = () => {
     const loading = useSelector(selectLiveMatchesLoading);
     const error = useSelector(selectLiveMatchesError);
     const dispatch = useDispatch();
+    const pollingIntervalRef = useRef(null);
     
+    // Initial data fetch
     useEffect(() => {
         dispatch(fetchLiveMatches());
+    }, [dispatch]);
+
+    // Set up polling for live matches data (5 seconds)
+    useEffect(() => {
+        // Start polling every 5 seconds for live matches
+        const startPolling = () => {
+            pollingIntervalRef.current = setInterval(() => {
+                console.log('🔄 In-Play page polling live matches data...');
+                dispatch(silentUpdateLiveMatches());
+            }, 5000); // Poll every 5 seconds
+        };
+
+        // Start polling after initial load
+        const timeoutId = setTimeout(() => {
+            startPolling();
+        }, 2000); // Wait 2 seconds after initial load
+
+        // Cleanup function
+        return () => {
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+            }
+            clearTimeout(timeoutId);
+        };
+    }, [dispatch]);
+
+    // Pause polling when tab is not visible (performance optimization)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // Pause polling when tab is hidden
+                if (pollingIntervalRef.current) {
+                    clearInterval(pollingIntervalRef.current);
+                    pollingIntervalRef.current = null;
+                    console.log('⏸️ In-Play page polling paused - tab not visible');
+                }
+            } else {
+                // Resume polling when tab becomes visible
+                if (!pollingIntervalRef.current) {
+                    pollingIntervalRef.current = setInterval(() => {
+                        console.log('🔄 In-Play page resuming live matches polling...');
+                        dispatch(silentUpdateLiveMatches());
+                    }, 5000);
+                    console.log('▶️ In-Play page polling resumed - tab visible');
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [dispatch]);
 
     // Transform Unibet API data to match MatchListPage expected format
@@ -108,6 +164,7 @@ const InPlayPage = () => {
         retryFunction: () => dispatch(fetchLiveMatches()),
         matchTimeComponent: LiveTimer, // Use LiveTimer component for real-time updates
         PageIcon: Clock,
+        hideOdds: true, // Hide odds buttons on In-Play page
         noMatchesConfig: {
             title: 'No Live Matches',
             message: 'There are no live matches available at the moment. Check back later for live games.',
