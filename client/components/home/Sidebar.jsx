@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {  ChevronRight, Pin, Users, Settings, DollarSign, X, Search, Globe, TrendingUp, Trophy, Flag } from 'lucide-react';
+import ReactCountryFlag from 'react-country-flag';
 import { useCustomSidebar } from '../../contexts/SidebarContext.js';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectUser } from '@/lib/features/auth/authSlice';
@@ -642,14 +643,17 @@ const Sidebar = () => {
                                                                     aria-expanded={isExpanded}
                                                                 >
                                                                     <div className="flex items-center">
-                                                                        <img 
-                                                                            src={`https://flagcdn.com/w20/${getCountryFlag(country.name).toLowerCase()}.png`}
-                                                                            alt={country.name}
-                                                                            className="w-5 h-4 mr-2 object-cover rounded-sm border border-gray-600"
-                                                                            onError={(e) => {
-                                                                                e.target.style.display = 'none';
-                                                                                e.target.nextSibling.style.display = 'inline';
+                                                                        <ReactCountryFlag
+                                                                            countryCode={getCountryFlag(country.name)}
+                                                                            svg
+                                                                            style={{
+                                                                                width: '20px',
+                                                                                height: '16px',
+                                                                                marginRight: '8px',
+                                                                                borderRadius: '2px',
+                                                                                border: '1px solid #4b5563'
                                                                             }}
+                                                                            title={country.name}
                                                                         />
                                                                         <Flag 
                                                                             className="w-4 h-4 mr-2 text-gray-400 hidden" 

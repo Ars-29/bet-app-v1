@@ -130,25 +130,6 @@ export class BetSchemaAdapter {
         return side === 'home' ? parts[0].trim() : parts[1].trim();
     }
 
-    /**
-     * Fetch match data from the fixture service
-     * @param {string} matchId - Match ID
-     * @returns {Object|null} - Match data or null if not found
-     */
-    static async fetchMatchData(matchId) {
-        try {
-            // Import the fixture service dynamically to avoid circular dependencies
-            const { default: FixtureService } = await import('./fixture.service.js');
-            const fixtureService = new FixtureService();
-            
-            // Try to get match data from cache or API
-            const matchData = await fixtureService.getMatchById(matchId);
-            return matchData;
-        } catch (error) {
-            console.warn(`[fetchMatchData] Failed to fetch match data for ${matchId}:`, error.message);
-            return null;
-        }
-    }
 
     /**
      * Convert calculator result back to bet-app format
@@ -259,17 +240,14 @@ export class BetSchemaAdapter {
      * @param {Object} bet - bet-app Bet document with combination array
      * @returns {Array} - Array of calculator-compatible bet objects (one per leg)
      */
-    static async adaptCombinationBetForCalculator(bet) {
+    static adaptCombinationBetForCalculator(bet) {
         if (!bet.combination || !Array.isArray(bet.combination)) {
             throw new Error('Invalid combination bet: missing combination array');
         }
         
         console.log(`[adaptCombinationBetForCalculator] Processing combination bet ${bet._id} with ${bet.combination.length} legs`);
         
-        const results = [];
-        
-        for (let index = 0; index < bet.combination.length; index++) {
-            const leg = bet.combination[index];
+        return bet.combination.map((leg, index) => {
             
             // Create a single bet object for this leg using the leg's data
             const legBet = {
@@ -311,37 +289,16 @@ export class BetSchemaAdapter {
             // Ensure league information is available - prioritize leg fields, then unibetMeta
             if (!legBet.leagueId && leg.unibetMeta?.leagueId) {
                 legBet.leagueId = leg.unibetMeta.leagueId;
+                console.log(`[adaptCombinationBetForCalculator] Set leagueId from unibetMeta: ${legBet.leagueId}`);
             }
             if (!legBet.leagueName && leg.unibetMeta?.leagueName) {
                 legBet.leagueName = leg.unibetMeta.leagueName;
-            }
-            
-            // If still no league information, try to fetch it from match data
-            if (!legBet.leagueId || !legBet.leagueName) {
-                try {
-                    console.log(`[adaptCombinationBetForCalculator] Fetching league info for match ${leg.matchId}...`);
-                    const matchData = await this.fetchMatchData(leg.matchId);
-                    if (matchData) {
-                        if (!legBet.leagueId && matchData.league?.id) {
-                            legBet.leagueId = matchData.league.id;
-                            console.log(`[adaptCombinationBetForCalculator] Set leagueId from match data: ${legBet.leagueId}`);
-                        }
-                        if (!legBet.leagueName && matchData.league?.name) {
-                            legBet.leagueName = matchData.league.name;
-                            console.log(`[adaptCombinationBetForCalculator] Set leagueName from match data: ${legBet.leagueName}`);
-                        }
-                    }
-                } catch (error) {
-                    console.warn(`[adaptCombinationBetForCalculator] Failed to fetch match data for ${leg.matchId}:`, error.message);
-                }
+                console.log(`[adaptCombinationBetForCalculator] Set leagueName from unibetMeta: ${legBet.leagueName}`);
             }
             
             // Use the existing single bet adapter
-            const adaptedBet = this.adaptBetForCalculator(legBet);
-            results.push(adaptedBet);
-        }
-        
-        return results;
+            return this.adaptBetForCalculator(legBet);
+        });
     }
 
     /**

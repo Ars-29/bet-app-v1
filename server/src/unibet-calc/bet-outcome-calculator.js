@@ -252,7 +252,6 @@ export default class BetOutcomeCalculator {
                     
                     dateKeys.forEach(dateKey => {
                         if (data[dateKey] && data[dateKey].leagues) {
-                            console.log(`   - Adding ${data[dateKey].leagues.length} leagues from ${dateKey}`);
                             allLeagues.push(...data[dateKey].leagues);
                         }
                     });
@@ -278,8 +277,27 @@ export default class BetOutcomeCalculator {
                 console.log(`   - Filtering matches for date: ${filterDate} ${useTestDate ? '(TEST MODE)' : ''}`);
                 
                 let matchesForDate = 0;
-                const filteredLeagues = leaguesData.leagues.map(league => {
-                    const filteredMatches = (league.matches || []).filter(match => {
+                
+                // First, merge leagues with the same ID to avoid duplicates
+                const leagueMap = new Map();
+                leaguesData.leagues.forEach(league => {
+                    if (leagueMap.has(league.id)) {
+                        // Merge matches from leagues with same ID
+                        const existingLeague = leagueMap.get(league.id);
+                        existingLeague.matches = [...(existingLeague.matches || []), ...(league.matches || [])];
+                    } else {
+                        leagueMap.set(league.id, { ...league });
+                    }
+                });
+                const mergedLeagues = Array.from(leagueMap.values());
+                
+                console.log(`   - After merging: ${mergedLeagues.length} unique leagues (was ${leaguesData.leagues.length})`);
+                
+                const filteredLeagues = mergedLeagues.map(league => {
+                    const exactDateMatches = [];
+                    const within24hMatches = [];
+                    
+                    (league.matches || []).forEach(match => {
                         let matchDate;
                         if (match.status?.utcTime) {
                             matchDate = new Date(match.status.utcTime);
@@ -296,29 +314,59 @@ export default class BetOutcomeCalculator {
                                 matchDate = new Date(timeStr);
                             }
                         } else {
-                            return false;
+                            return;
                         }
                         const matchDateStr = matchDate.toISOString().slice(0, 10);
                         
                         // Check exact date first
                         if (matchDateStr === filterDate) {
-                            matchesForDate++;
-                            return true;
+                            exactDateMatches.push(match);
+                        } else {
+                            // Only check 24-hour window if no exact date matches found
+                            const betDate = new Date(filterDate);
+                            const timeDifference = Math.abs(matchDate.getTime() - betDate.getTime());
+                            const hoursDifference = timeDifference / (1000 * 60 * 60);
+                            
+                            if (hoursDifference <= 24) {
+                                within24hMatches.push(match);
+                            }
                         }
-                        
-                        // If no exact matches found, also check within 24 hours (for timezone issues)
-                        const betDate = new Date(filterDate);
-                        const timeDifference = Math.abs(matchDate.getTime() - betDate.getTime());
-                        const hoursDifference = timeDifference / (1000 * 60 * 60);
-                        
-                        if (hoursDifference <= 24) {
-                            console.log(`   - Including match within 24h: ${match.home?.name || 'Unknown'} vs ${match.away?.name || 'Unknown'} (${hoursDifference.toFixed(1)}h difference)`);
-                            matchesForDate++;
-                            return true;
-                        }
-                        
-                        return false;
                     });
+                    
+                    // Simple logic: Use exact date matches if found, otherwise use 24h window
+                    const filteredMatches = exactDateMatches.length > 0 ? exactDateMatches : within24hMatches;
+                    matchesForDate += filteredMatches.length;
+                    
+                    // Debug logging for Primera B league
+                    if (league.id === 9126) {
+                        console.log(`   🔍 DEBUG: Primera B league (${league.id}) filtering:`);
+                        console.log(`   - Total matches in league: ${(league.matches || []).length}`);
+                        console.log(`   - Exact date matches (${filterDate}): ${exactDateMatches.length}`);
+                        console.log(`   - Within 24h matches: ${within24hMatches.length}`);
+                        console.log(`   - Final filtered matches: ${filteredMatches.length}`);
+                        
+                        // Show all matches in this league
+                        (league.matches || []).forEach((match, i) => {
+                            let matchDate;
+                            if (match.status?.utcTime) {
+                                matchDate = new Date(match.status.utcTime);
+                            } else if (match.time) {
+                                const timeStr = match.time;
+                                if (timeStr.includes('.') && timeStr.split('.').length === 3) {
+                                    const [datePart, timePart] = timeStr.split(' ');
+                                    const [day, month, year] = datePart.split('.');
+                                    const isoFormat = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart}:00.000Z`;
+                                    matchDate = new Date(isoFormat);
+                                } else {
+                                    matchDate = new Date(timeStr);
+                                }
+                            }
+                            if (matchDate) {
+                                const matchDateStr = matchDate.toISOString().slice(0, 10);
+                                console.log(`   - Match ${i + 1}: ${match.home?.name} vs ${match.away?.name} at ${matchDateStr} (${matchDate.toISOString()})`);
+                            }
+                        });
+                    }
 
                     return {
                         ...league,
@@ -405,6 +453,9 @@ export default class BetOutcomeCalculator {
         return name
             .toLowerCase()
             .trim()
+            // Normalize accented characters
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
             // Remove common prefixes/suffixes
             .replace(/\b(fc|cf|ac|sc|united|utd|city|town|rovers|wanderers|athletic|albion)\b/g, '')
             // Remove special characters and extra spaces
@@ -734,6 +785,7 @@ export default class BetOutcomeCalculator {
 
             console.log(`   - Home similarity: "${bet.homeName}" vs "${match.home?.name || ''}" = ${homeScore.toFixed(3)}`);
             console.log(`   - Away similarity: "${bet.awayName}" vs "${match.away?.name || ''}" = ${awayScore.toFixed(3)}`);
+            console.log(`   - Normalized: "${this.normalizeTeamName(bet.awayName)}" vs "${this.normalizeTeamName(match.away?.name || '')}"`);
             console.log(`   - Total score: ${totalScore.toFixed(3)}`);
 
             if (totalScore > bestScore) {
