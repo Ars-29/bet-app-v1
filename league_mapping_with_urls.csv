@@ -118,6 +118,8 @@ Unibet_ID,Unibet_URL,Unibet_Name,Fotmob_URL,Fotmob_Name,Match_Type,Country/Regio
 2000130522,https://www.unibet.com.au/betting/sports/filter/football/conference_league,Conference League,https://www.fotmob.com/leagues/10216,Conference League,Exact Match,International
 2010133908,https://www.unibet.com.au/betting/sports/filter/football/world_cup_2026,World Cup 2026,https://www.fotmob.com/leagues/77,World Cup,Different Name,International
 2000086372,https://www.unibet.com.au/betting/sports/filter/football/world_cup_qualifying_-_europe,World Cup Qualifying - Europe,https://www.fotmob.com/leagues/10195,World Cup Qualification UEFA,Different Name,International
+2000086367,https://www.unibet.com.au/betting/sports/filter/football/world_cup_qualifying_-_asia,World Cup Qualifying - Asia,https://www.fotmob.com/leagues/10195,World Cup Qualification UEFA,Different Name,International
+2000086368,https://www.unibet.com.au/betting/sports/filter/football/world_cup_qualifying_-_asia,World Cup Qualifying - Africa,https://www.fotmob.com/leagues/10195,World Cup Qualification UEFA,Different Name,International
 2000052332,https://www.unibet.com.au/betting/sports/filter/football/argentina/primera_b_metropolitana,Primera B Metropolitana,https://www.fotmob.com/leagues/9213,Primera B Metropolitana & Torneo Federal A,Different Name,Argentina
 2000057542,https://www.unibet.com.au/betting/sports/filter/football/bosnia___herzegovina/prva_liga,Prva Liga,https://www.fotmob.com/leagues/173,Prva Liga,Exact Match,Bosnia-Herzegovina
 1000095736,https://www.unibet.com.au/betting/sports/filter/football/croatia/1__hnl_league,1. HNL League,https://www.fotmob.com/leagues/252,HNL,Different Name,Croatia
@@ -151,3 +153,11 @@ Unibet_ID,Unibet_URL,Unibet_Name,Fotmob_URL,Fotmob_Name,Match_Type,Country/Regio
 1000176396,https://www.unibet.com.au/betting/sports/filter/football/sweden/obos_damallsvenskan__w_,OBOS Damallsvenskan (W),https://www.fotmob.com/leagues/9089,Damallsvenskan (W),Different Name,Sweden
 1000095021,https://www.unibet.com.au/betting/sports/filter/football/switzerland/challenge_league,Challenge League,https://www.fotmob.com/leagues/163,Challenge League,Exact Match,Switzerland
 2000076226,https://www.unibet.com.au/betting/sports/filter/football/thailand/thai_league_2,Thai League 2,https://www.fotmob.com/leagues/9498,Thai League 2,Exact Match,Thailand
+1000093570,https://www.unibet.com.au/betting/sports/filter/football/international_friendly_matches,International Friendly Matches,https://www.fotmob.com/leagues/114/overview/friendlies,Friendlies,Different Name,International
+2000065880,https://www.unibet.com.au/betting/sports/filter/football/uefa_championship_qualification_u21,uefa_championship_qualification_u21,https://www.fotmob.com/leagues/10437,euro-u-21-qualification,Different Name,International
+2000086369,https://www.unibet.com.au/betting/sports/filter/football/world_cup_qualifying_-_north__central___caribbean,World Cup Qualifying - North, Central & Caribbean,https://www.fotmob.com/leagues/10198,World Cup Qualification CONCACAF,Different Name,International
+2000054642,https://www.unibet.com.au/betting/sports/filter/football/england/isthmian_league_premier_division,Isthmian League Premier Division,https://www.fotmob.com/leagues/8947,premier-division,Different Name,England
+2000054030,https://www.unibet.com.au/betting/sports/filter/football/england/northern_league_premier_division,Northern League Premier Division,https://www.fotmob.com/leagues/8947,premier-division,Different Name,England
+2000052846,https://www.unibet.com.au/betting/sports/filter/football/england/southern_league_premier_division,Southern League Premier Division,https://www.fotmob.com/leagues/8947,premier-division,Different Name,England
+2000066138,https://www.unibet.com.au/betting/sports/filter/football/afc_asian_cup_qualification,AFC Asian Cup Qualification,https://www.fotmob.com/leagues/10609,Asian Cup  Qualification Playoff,Different Name,International
+1000383729,https://www.unibet.com.au/betting/sports/filter/football/denmark/elitedivisionen__w_,Elitedivisionen (W),https://www.fotmob.com/leagues/256,Kvindeligaen,Different Name,Denmark

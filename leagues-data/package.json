@@ -1,0 +1,28 @@
+{
+  "name": "leagues-data-fetcher",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scripts to fetch league data from Fotmob and Unibet APIs",
+  "main": "index.js",
+  "scripts": {
+    "fetch-fotmob": "node fetch-fotmob-leagues.js",
+    "fetch-unibet": "node fetch-unibet-leagues.js",
+    "fetch-all": "node fetch-fotmob-leagues.js && node fetch-unibet-leagues.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "football",
+    "leagues",
+    "fotmob",
+    "unibet",
+    "api",
+    "data-fetching"
+  ],
+  "author": "Betting App",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -115,12 +115,22 @@ Unibet_ID,Unibet_Name,Fotmob_ID,Fotmob_Name,Match_Type,Country/Region
 2000130522,Conference League,10216,Conference League,Exact Match,International
 2010133908,World Cup 2026,77,World Cup,Different Name,International
 2000086372,World Cup Qualifying - Europe,10195,World Cup Qualification UEFA,Different Name,International
+2000086367,World Cup Qualifying - Asia,10195,World Cup Qualification UEFA,Different Name,International
+2000086368,World Cup Qualifying - Africa,10195,World Cup Qualification UEFA,Different Name,International
 2000052332,Primera B Metropolitana,9213,Primera B Metropolitana & Torneo Federal A,Different Name,Argentina
 2000057542,Prva Liga,173,Prva Liga,Exact Match,Bosnia-Herzegovina
 1000095736,1. HNL League,252,HNL,Different Name,Croatia
+2000065880,UEFA Championship Qualification U21,10437,EURO U-21 Qualification,Different Name,International
 2000117732,Copa Ecuador,10046,Copa Ecuador,Exact Match,Ecuador
+1000383729,Elitedivisionen (W),256,Kvindeligaen,Different Name,Denmark
+2000086369,World Cup Qualifying - North, Central & Caribbean,10198,World Cup Qualification CONCACAF,Different Name,International
+1000093570,International Friendly Matches,114,Friendlies,Different Name,International
+2000054642,Isthmian League Premier Division,8947,premier division,Different Name,England
 2000050126,National League North,117,National League,Different Name,England
+2000054030,Northern League Premier Division,8947,premier-division,Different Name,England
+2000052846,Southern League Premier Division,8947,premier-division,Different Name,England
 1000385084,National League South,117,National League,Different Name,England
+2000066138,AFC Asian Cup Qualification,10609,Asian Cup  Qualification Playoff,Different Name,International
 2000052405,Erovnuli Liga,439,Erovnuli Liga,Exact Match,Georgia
 1000355562,3. Liga,208,3. Liga,Exact Match,Germany
 1000094996,Super League,135,Super League 1,Different Name,Greece

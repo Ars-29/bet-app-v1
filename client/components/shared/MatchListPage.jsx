@@ -276,7 +276,7 @@ const MatchListPage = ({ config }) => {
                                                             isInPlay={pageTitle === 'Live Matches'}
                                                         >
                                                             <div className="px-4 py-3 hover:bg-gray-50 transition-colors">
-                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center justify-between">
                                                                 <div className="flex-1">
                                                                     {/* Match Time/Date and Indicator */}
                                                                     <div className="flex items-center justify-between mb-1.5"> {/* Reduced margin */}
@@ -320,9 +320,42 @@ const MatchListPage = ({ config }) => {
                                                                         </div>
                                                                     </Link>
                                                                 </div>
-                                                                {/* Betting Buttons */}
-                                                                {!hideOdds && (
-                                                                    <div className="flex gap-1 ml-2 md:ml-4"> {/* Adjusted margin for responsiveness */}
+                                                                
+                                                                {/* Cards and Corners + Betting Buttons Container */}
+                                                                <div className="flex items-center gap-3">
+                                                                    {/* Cards and Corners - three separate columns like home page */}
+                                                                    {match.kambiLiveData?.statistics?.football && (
+                                                                        <div className="flex items-center justify-center gap-2 text-xs">
+                                                                            {/* Yellow cards column */}
+                                                                            <div className="flex flex-col items-center justify-center gap-1">
+                                                                                <div className="w-2 h-2 bg-yellow-500 border-0"></div>
+                                                                                <div className="text-[10px]">
+                                                                                    <div className="text-xs">{(match.kambiLiveData?.statistics?.football?.home?.yellowCards || 0)}</div>
+                                                                                    <div className="text-xs">{(match.kambiLiveData?.statistics?.football?.away?.yellowCards || 0)}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Red cards column */}
+                                                                            <div className="flex flex-col items-center justify-center gap-1">
+                                                                                <div className="w-2 h-2 bg-red-500 border-0"></div>
+                                                                                <div className="text-[10px]">
+                                                                                    <div className="text-xs">{(match.kambiLiveData?.statistics?.football?.home?.redCards || 0)}</div>
+                                                                                    <div className="text-xs">{(match.kambiLiveData?.statistics?.football?.away?.redCards || 0)}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Corners column */}
+                                                                            <div className="flex flex-col items-center justify-top gap-1">
+                                                                                <div className="text-red-600 text-[10px]">🚩</div>
+                                                                                <div className="text-[10px]">
+                                                                                    <div className="text-xs">{(match.kambiLiveData?.statistics?.football?.home?.corners || 0)}</div>
+                                                                                    <div className="text-xs">{(match.kambiLiveData?.statistics?.football?.away?.corners || 0)}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* Betting Buttons */}
+                                                                    {!hideOdds && (
+                                                                        <div className="flex gap-1"> {/* Removed margin since we're in a flex container */}
                                                                     {match.odds && match.odds.home && (
                                                                         <Button
                                                                             size="sm"
@@ -415,6 +448,7 @@ const MatchListPage = ({ config }) => {
                                                                     )}
                                                                     </div>
                                                                 )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         </MatchWithOddsSync>
