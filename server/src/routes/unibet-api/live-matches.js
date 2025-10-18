@@ -271,7 +271,6 @@ function mergeLiveOddsWithMatches(matches, oddsMap, liveDataMap = {}) {
     const enrichedMatch = { ...match };
     
     if (matchOdds) {
-      console.log(`✅ Found odds for match ${match.id}:`, matchOdds);
       enrichedMatch.liveOdds = {
         betOfferId: matchOdds.betOfferId,
         outcomes: matchOdds.outcomes

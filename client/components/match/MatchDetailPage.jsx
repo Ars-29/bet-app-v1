@@ -215,6 +215,13 @@ const MatchDetailPage = ({ matchId }) => {
                 .filter(offer => {
                     const marketName = offer.criterion?.label || offer.criterion?.englishLabel || offer.betOfferType?.name;
                     const isImplemented = isMarketImplemented(marketName);
+                    
+                    // Debug penalty markets
+                    if (marketName && marketName.toLowerCase().includes('penalty')) {
+                        console.log('🔍 Penalty market found:', marketName, 'Implemented:', isImplemented);
+                        console.log('🔍 Full offer data:', offer);
+                    }
+                    
                     if (!isImplemented) {
                     }
                     return isImplemented;
@@ -451,6 +458,7 @@ const IMPLEMENTED_MARKETS = [
     'Cards 3-Way Line',
     '3-Way Line',
     '3-Way Handicap',
+    'Corners 3-Way Handicap',
     'total corners by team',
     'total corners',
     'most corners',
@@ -458,11 +466,23 @@ const IMPLEMENTED_MARKETS = [
     // 'next corner no corner no bet',
     'Most Corners - 50:00-59:59',
     'team given a red card',
+    'given a red card',
     'to get a card',
     'most cards',
     'red card given',
     'most red cards',
     'player\'s shots on target',
+    'Total Shots (Settled using Opta data)',
+    'Total Shots on Target (Settled using Opta data)',
+    'Total Shots by',
+    'Total Shots on Target by',
+    'Most Shots on Target (Settled using Opta data)',
+    'Total Offsides (Settled using Opta data)',
+    'Total Offsides by',
+    '3-Way Handicap - 1st Half',
+    'Asian Total - 1st Half',
+    'Asian Total',
+    'First Goal (Draw: No Goals)',
     'To score',
     'To score atleat 2 goals',
     '2nd Half',
@@ -483,16 +503,28 @@ const IMPLEMENTED_MARKETS = [
     'To Score Or Assist',
     'To score from outside the penalty box',
     'To score from a header',
+    'Penalty Kick awarded',
+    'to score from a penalty',
+    'Club Bolívar to score from a penalty',
+    'Atlético Mineiro-MG to score from a penalty',
+    'Own goal',
     'Half Time',
+    'Double Chance - 2nd Half',
+    'Double Chance - 1st Half',
+    'Win to Nil',
+    'to Win to Nil',
 ];
 
 // Helper function to check if a market is implemented
 function isMarketImplemented(marketName) {
     const name = marketName.toLowerCase();
     
+    // Debug penalty markets specifically
+    if (name.includes('penalty')) {
+        console.log('🔍 Checking penalty market:', name);
+    }
+    
     // Exclude specific markets that should not be shown
-    if (name.includes('double chance') && name.includes('1st half')) return false;
-    if (name.includes('double chance') && name.includes('2nd half')) return false;
     if (name.includes('total corner') && name.includes('1st half')) return false;
     if (name.includes('to score at least 3 goals')) return false;
     
@@ -508,6 +540,14 @@ function isMarketImplemented(marketName) {
     
     // Special cases for flexible matching
     if (name.includes('double chance')) return true;
+    if (name.includes('to score from a penalty')) {
+        console.log('✅ Penalty market matched by flexible pattern:', name);
+        return true;
+    }
+    if (name.includes('win to nil')) {
+        console.log('✅ Win to Nil market matched by flexible pattern:', name);
+        return true;
+    }
     if (name.includes('half time') && name.includes('full time')) return true;
     if (name.includes('total goals by') && !name.includes('2nd half') && !name.includes('30:00-59:59')) return true;
     if (name.includes('total goals by') && !name.includes('1st half') && !name.includes('30:00-59:59')) return true;
@@ -536,6 +576,7 @@ function isMarketImplemented(marketName) {
     // if (name.includes('next corner') && name.includes('no corner') && name.includes('no bet')) return true;
     if (name.includes('most corners') && name.includes('50:00-59:59')) return true;
     if (name.includes('team given a red card')) return true;
+    if (name.includes('given a red card')) return true;
     if (name.includes('to get a card')) return true;
     if (name.includes('to get a red card')) return true;
     if (name.includes('first goal scorer')) return true;
@@ -544,6 +585,17 @@ function isMarketImplemented(marketName) {
     if (name.includes('red card given')) return true;
     if (name.includes('most red cards')) return true;
     if (name.includes('player\'s shots on target')) return true;
+    if (name.includes('total shots') && !name.includes('player')) return true;
+    if (name.includes('total shots on target') && !name.includes('player')) return true;
+    if (name.includes('shots by') && !name.includes('player')) return true;
+    if (name.includes('shots on target by') && !name.includes('player')) return true;
+    if (name.includes('most shots on target') && !name.includes('player')) return true;
+    if (name.includes('total offsides') && !name.includes('player')) return true;
+    if (name.includes('offsides by') && !name.includes('player')) return true;
+    if (name.includes('3-way handicap') && name.includes('1st half')) return true;
+    if (name.includes('asian total') && name.includes('1st half')) return true;
+    if (name.includes('asian total') && !name.includes('1st half')) return true;
+    if (name.includes('first goal') && !name.includes('player')) return true;
     if (name.includes('to score')) return true;
     if (name.includes('to score') && name.includes('at least 2 goals') && name.includes('team member')) return true;
     if (name.includes('2nd half') && !name.includes('draw no bet') && !name.includes('total goals')) return true;
@@ -558,6 +610,8 @@ function isMarketImplemented(marketName) {
     if (name.includes('to score from outside the penalty box')) return true;
     if (name.includes('to score from a header')) return true;
     if (name.includes('half time') && !name.includes('total') && !name.includes('goals')) return true;
+    if (name.includes('double chance') && name.includes('2nd half')) return true;
+    if (name.includes('double chance') && name.includes('1st half')) return true;
     
     return false;
 }
@@ -584,6 +638,16 @@ function categorizeMarkets(bettingData) {
         // Filter out non-implemented markets
         if (!isMarketImplemented(offer.name)) {
             return; // Skip this market
+        }
+        
+        // Debug: Log Total Offsides market
+        if (offer.name.toLowerCase().includes('total offsides')) {
+            console.log('🎯 Found Total Offsides market:', offer.name);
+        }
+        
+        // Debug: Log penalty markets
+        if (offer.name.toLowerCase().includes('penalty')) {
+            console.log('🎯 Found penalty market:', offer.name);
         }
         
         // Enhanced categorization logic (matching unibet-api app)
@@ -613,20 +677,44 @@ function categorizeMarkets(bettingData) {
         categorized.scorers.push(offer);
     } else if (marketName.includes('to score from a header')) {
         categorized.scorers.push(offer);
+    } else if (marketName.includes('penalty kick awarded')) {
+        categorized.other.push(offer);
+    } else if (marketName.includes('to score from a penalty')) {
+        console.log('🎯 Categorizing penalty market as other:', offer.name);
+        categorized.other.push(offer);
+    } else if (marketName.includes('club bolívar to score from a penalty') || marketName.includes('atlético mineiro-mg to score from a penalty')) {
+        console.log('🎯 Categorizing specific penalty market as other:', offer.name);
+        categorized.other.push(offer);
+    } else if (marketName.includes('own goal')) {
+        console.log('🎯 Categorizing own goal market as other:', offer.name);
+        categorized.other.push(offer);
     } else if (marketName.includes('half time') && !marketName.includes('total') && !marketName.includes('goals')) {
+        categorized.results.push(offer);
+    } else if (marketName.includes('double chance') && marketName.includes('2nd half')) {
+        categorized.results.push(offer);
+    } else if (marketName.includes('double chance') && marketName.includes('1st half')) {
         categorized.results.push(offer);
     } else if (marketName.includes('both teams to score') || marketName.includes('btts')) {
             categorized.goals.push(offer);
         } else if (marketName.includes('to score') || marketName.includes('goalscorer') || marketName.includes('scorer') || marketName.includes('first goal')) {
             categorized.scorers.push(offer);
+        } else if (marketName.includes('win to nil')) {
+            categorized.other.push(offer);
         } else if (marketName.includes('goal') || marketName.includes('score') || marketName.includes('total') || 
                    marketName.includes('correct score') || marketName.includes('half time')) {
             categorized.goals.push(offer);
+            // Debug: Log Total Offsides categorization
+            if (marketName.includes('total offsides')) {
+                console.log('🎯 Total Offsides categorized into goals category');
+            }
         } else {
             categorized.other.push(offer);
         }
     });
 
+    // Debug: Log category counts
+    console.log('🎯 Category counts:', Object.keys(categorized).map(key => `${key}: ${categorized[key].length}`));
+    
     // Remove empty categories
     Object.keys(categorized).forEach(key => {
         if (categorized[key].length === 0) {
@@ -634,6 +722,7 @@ function categorizeMarkets(bettingData) {
         }
     });
 
+    console.log('🎯 Final categories:', Object.keys(categorized));
     return categorized;
 }
 

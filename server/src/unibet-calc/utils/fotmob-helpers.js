@@ -148,7 +148,13 @@ export function getNthGoal(matchDetails, n) {
 
 function findTeamStatPair(matchDetails, wantedKey) {
     const groups = matchDetails?.content?.stats?.Periods?.All?.stats;
-    if (!Array.isArray(groups)) return null;
+    if (!Array.isArray(groups)) {
+        console.log(`   - No stats groups found for key: ${wantedKey}`);
+        return null;
+    }
+    
+    console.log(`   - Looking for key: ${wantedKey}`);
+    console.log(`   - Found ${groups.length} stat groups`);
     
     for (const group of groups) {
         if (!group?.stats || !Array.isArray(group.stats)) continue;
@@ -156,21 +162,33 @@ function findTeamStatPair(matchDetails, wantedKey) {
         for (const s of group.stats) {
             if (!s) continue;
             
+            // Log available keys for debugging
+            if (s.key) {
+                console.log(`   - Found stat key: ${s.key}`);
+            }
+            
             // Direct match
             if (s.key === wantedKey && Array.isArray(s.stats) && s.stats.length === 2) {
+                console.log(`   - Found direct match for ${wantedKey}: home=${s.stats[0]}, away=${s.stats[1]}`);
                 return { home: Number(s.stats[0] ?? 0), away: Number(s.stats[1] ?? 0) };
             }
             
             // Nested stats array (this is the main case for FotMob structure)
             if (Array.isArray(s.stats)) {
                 for (const nested of s.stats) {
+                    if (nested && nested.key) {
+                        console.log(`   - Found nested stat key: ${nested.key}`);
+                    }
                     if (nested && nested.key === wantedKey && Array.isArray(nested.stats) && nested.stats.length === 2) {
+                        console.log(`   - Found nested match for ${wantedKey}: home=${nested.stats[0]}, away=${nested.stats[1]}`);
                         return { home: Number(nested.stats[0] ?? 0), away: Number(nested.stats[1] ?? 0) };
                     }
                 }
             }
         }
     }
+    
+    console.log(`   - No match found for key: ${wantedKey}`);
     return null;
 }
 
@@ -542,4 +560,186 @@ export function getPlayerGoalsFromHeader(matchDetails, playerId) {
     
     console.log(`   - Total header goals: ${headerGoals}`);
     return headerGoals;
+}
+
+export function getTeamShots(matchDetails) {
+    console.log(`🔍 Getting team shots from match data...`);
+    
+    // Try "total_shots" first (more likely to have data)
+    let pair = findTeamStatPair(matchDetails, 'total_shots');
+    console.log(`   - Found total_shots in stats: ${!!pair}`);
+    
+    // If total_shots is null/empty, try "shots"
+    if (!pair || (pair.home === null && pair.away === null)) {
+        console.log(`   - total_shots not found or null, trying shots...`);
+        pair = findTeamStatPair(matchDetails, 'shots');
+        console.log(`   - Found shots in stats: ${!!pair}`);
+    }
+    
+    // If still no data, try shotmap fallback
+    if (!pair || (pair.home === null && pair.away === null)) {
+        console.log(`   - No shots found in stats, trying shotmap fallback...`);
+        // Fallback: try to calculate from shotmap
+        const shotmap = matchDetails?.shotmap || matchDetails?.header?.events?.shotmap || [];
+        console.log(`   - Shotmap available: ${Array.isArray(shotmap)} (${shotmap.length} shots)`);
+        
+        let homeShots = 0;
+        let awayShots = 0;
+        
+        if (Array.isArray(shotmap)) {
+            for (const shot of shotmap) {
+                if (shot?.isHome) {
+                    homeShots++;
+                } else {
+                    awayShots++;
+                }
+            }
+        }
+        
+        console.log(`   - Calculated from shotmap: home=${homeShots}, away=${awayShots}, total=${homeShots + awayShots}`);
+        return { home: homeShots, away: awayShots, total: homeShots + awayShots };
+    }
+    
+    console.log(`   - Found in stats: home=${pair.home}, away=${pair.away}, total=${pair.home + pair.away}`);
+    return { ...pair, total: pair.home + pair.away };
+}
+
+export function getTeamShotsOnTarget(matchDetails) {
+    console.log(`🔍 Getting team shots on target from match data...`);
+    
+    // Try "shotsontarget" first
+    let pair = findTeamStatPair(matchDetails, 'shotsontarget');
+    console.log(`   - Found shotsontarget in stats: ${!!pair}`);
+    
+    // If shotsontarget is null/empty, try "ShotsOnTarget" (capitalized)
+    if (!pair || (pair.home === null && pair.away === null)) {
+        console.log(`   - shotsontarget not found or null, trying ShotsOnTarget...`);
+        pair = findTeamStatPair(matchDetails, 'ShotsOnTarget');
+        console.log(`   - Found ShotsOnTarget in stats: ${!!pair}`);
+    }
+    
+    // If still no data, try shotmap fallback
+    if (!pair || (pair.home === null && pair.away === null)) {
+        console.log(`   - No shots on target found in stats, trying shotmap fallback...`);
+        // Fallback: try to calculate from shotmap
+        const shotmap = matchDetails?.shotmap || matchDetails?.header?.events?.shotmap || [];
+        console.log(`   - Shotmap available: ${Array.isArray(shotmap)} (${shotmap.length} shots)`);
+        
+        let homeShotsOnTarget = 0;
+        let awayShotsOnTarget = 0;
+        
+        if (Array.isArray(shotmap)) {
+            for (const shot of shotmap) {
+                if (shot?.isOnTarget) {
+                    if (shot?.isHome) {
+                        homeShotsOnTarget++;
+                    } else {
+                        awayShotsOnTarget++;
+                    }
+                }
+            }
+        }
+        
+        console.log(`   - Calculated from shotmap: home=${homeShotsOnTarget}, away=${awayShotsOnTarget}, total=${homeShotsOnTarget + awayShotsOnTarget}`);
+        return { home: homeShotsOnTarget, away: awayShotsOnTarget, total: homeShotsOnTarget + awayShotsOnTarget };
+    }
+    
+    console.log(`   - Found in stats: home=${pair.home}, away=${pair.away}, total=${pair.home + pair.away}`);
+    return { ...pair, total: pair.home + pair.away };
+}
+
+export function getTeamOffsides(matchDetails) {
+    console.log(`🔍 Getting team offsides from match data...`);
+    
+    // Try "offsides" first
+    let pair = findTeamStatPair(matchDetails, 'offsides');
+    console.log(`   - Found offsides in stats: ${!!pair}`);
+    
+    // If offsides is null/empty, try "Offsides" (capitalized)
+    if (!pair || (pair.home === null && pair.away === null)) {
+        console.log(`   - offsides not found or null, trying Offsides...`);
+        pair = findTeamStatPair(matchDetails, 'Offsides');
+        console.log(`   - Found Offsides in stats: ${!!pair}`);
+    }
+    
+    if (!pair) {
+        console.log(`   - No offsides found in stats`);
+        return null;
+    }
+    
+    console.log(`   - Found in stats: home=${pair.home}, away=${pair.away}, total=${pair.home + pair.away}`);
+    return { ...pair, total: pair.home + pair.away };
+}
+
+export function getPenaltyKicksAwarded(matchDetails) {
+    console.log(`🔍 Getting penalty kicks awarded from match data...`);
+    
+    const events = matchDetails?.header?.events?.events || [];
+    let penaltyKicksAwarded = 0;
+    
+    for (const event of events) {
+        // Check for penalty kick events
+        if (event.type === 'Penalty' || 
+            (event.type === 'Goal' && event.raw?.shotmapEvent?.situation === 'Penalty') ||
+            (event.type === 'MissedPenalty') ||
+            (event.type === 'SavedPenalty')) {
+            penaltyKicksAwarded++;
+            console.log(`   - Found penalty kick at minute ${event.minute}: ${event.type}`);
+        }
+    }
+    
+    console.log(`   - Total penalty kicks awarded: ${penaltyKicksAwarded}`);
+    return penaltyKicksAwarded;
+}
+
+export function getTeamPenaltyGoals(matchDetails, teamName) {
+    console.log(`🔍 Getting penalty goals for team: ${teamName}`);
+    
+    const events = matchDetails?.header?.events?.events || [];
+    let penaltyGoals = 0;
+    
+    // Get team names to determine which team is home/away
+    const { homeName, awayName } = getTeamNames(matchDetails);
+    const isHomeTeam = teamName.toLowerCase().includes(homeName.toLowerCase()) || 
+                      homeName.toLowerCase().includes(teamName.toLowerCase());
+    const isAwayTeam = teamName.toLowerCase().includes(awayName.toLowerCase()) || 
+                      awayName.toLowerCase().includes(teamName.toLowerCase());
+    
+    console.log(`   - Home team: ${homeName}, Away team: ${awayName}`);
+    console.log(`   - Target team: ${teamName}`);
+    console.log(`   - Is home team: ${isHomeTeam}, Is away team: ${isAwayTeam}`);
+    
+    for (const event of events) {
+        // Check for penalty goals
+        if (event.type === 'Goal' && event.raw?.shotmapEvent?.situation === 'Penalty') {
+            const isEventForTargetTeam = (isHomeTeam && event.isHome === true) || 
+                                       (isAwayTeam && event.isHome === false);
+            
+            if (isEventForTargetTeam) {
+                penaltyGoals++;
+                console.log(`   - Found penalty goal at minute ${event.minute} for ${teamName}`);
+            }
+        }
+    }
+    
+    console.log(`   - Total penalty goals for ${teamName}: ${penaltyGoals}`);
+    return penaltyGoals;
+}
+
+export function getOwnGoals(matchDetails) {
+    console.log(`🔍 Getting own goals from match data...`);
+    
+    const events = matchDetails?.header?.events?.events || [];
+    let ownGoals = 0;
+    
+    for (const event of events) {
+        // Check for own goal events
+        if (event.type === 'Goal' && event.raw?.shotmapEvent?.situation === 'Own goal') {
+            ownGoals++;
+            console.log(`   - Found own goal at minute ${event.minute}`);
+        }
+    }
+    
+    console.log(`   - Total own goals: ${ownGoals}`);
+    return ownGoals;
 }

@@ -4,6 +4,17 @@ export const MarketCodes = {
     PLAYER_TO_SCORE: 'PLAYER_TO_SCORE',
     PLAYER_TO_SCORE_2PLUS: 'PLAYER_TO_SCORE_2PLUS',
     PLAYER_SOT_OU: 'PLAYER_SOT_OU',
+    TEAM_TOTAL_SHOTS_OU: 'TEAM_TOTAL_SHOTS_OU',
+    TEAM_SHOTS_ON_TARGET_OU: 'TEAM_SHOTS_ON_TARGET_OU',
+    TEAM_SHOTS_OU: 'TEAM_SHOTS_OU',
+    TEAM_SHOTS_ON_TARGET_BY: 'TEAM_SHOTS_ON_TARGET_BY',
+    MOST_SHOTS_ON_TARGET: 'MOST_SHOTS_ON_TARGET',
+    TOTAL_OFFSIDES: 'TOTAL_OFFSIDES',
+    TEAM_OFFSIDES_BY: 'TEAM_OFFSIDES_BY',
+    THREE_WAY_HANDICAP_1ST_HALF: 'THREE_WAY_HANDICAP_1ST_HALF',
+    ASIAN_TOTAL_1ST_HALF: 'ASIAN_TOTAL_1ST_HALF',
+    ASIAN_TOTAL: 'ASIAN_TOTAL',
+    FIRST_GOAL: 'FIRST_GOAL',
     PLAYER_CARD_ANY: 'PLAYER_CARD_ANY',
     PLAYER_CARD_RED: 'PLAYER_CARD_RED',
 
@@ -28,6 +39,7 @@ export const MarketCodes = {
     THREE_WAY_LINE: 'THREE_WAY_LINE',
     GOAL_IN_BOTH_HALVES: 'GOAL_IN_BOTH_HALVES',
     PLAYER_RED_CARD: 'PLAYER_RED_CARD',
+    TEAM_RED_CARD: 'TEAM_RED_CARD',
     FIRST_GOAL_SCORER: 'FIRST_GOAL_SCORER',
     GOALKEEPER_SAVES: 'GOALKEEPER_SAVES',
     GOALKEEPER_SAVES_TOTAL: 'GOALKEEPER_SAVES_TOTAL',
@@ -35,7 +47,13 @@ export const MarketCodes = {
     PLAYER_SCORE_OR_ASSIST: 'PLAYER_SCORE_OR_ASSIST',
     PLAYER_SCORE_OUTSIDE_PENALTY: 'PLAYER_SCORE_OUTSIDE_PENALTY',
     PLAYER_SCORE_HEADER: 'PLAYER_SCORE_HEADER',
+    PENALTY_KICK_AWARDED: 'PENALTY_KICK_AWARDED',
+    TEAM_SCORE_FROM_PENALTY: 'TEAM_SCORE_FROM_PENALTY',
+    OWN_GOAL: 'OWN_GOAL',
     HALF_TIME: 'HALF_TIME',
+    DOUBLE_CHANCE_2ND_HALF: 'DOUBLE_CHANCE_2ND_HALF',
+    DOUBLE_CHANCE_1ST_HALF: 'DOUBLE_CHANCE_1ST_HALF',
+    WIN_TO_NIL: 'WIN_TO_NIL',
 
     UNKNOWN: 'UNKNOWN'
 };
@@ -73,7 +91,125 @@ export const MARKET_REGISTRY = [
         match: (bet, norm) => {
             const name = norm.marketNameLower;
             const crit = norm.criterionLower;
-            return name.includes("player's shots on target") || crit.includes('shots on target');
+            return (name.includes("player's shots on target") || crit.includes('shots on target')) && 
+                   !name.includes('total shots on target') && 
+                   !crit.includes('total shots on target');
+        }
+    },
+    {
+        code: MarketCodes.FIRST_GOAL,
+        priority: 104,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match "First Goal" markets
+            return (name.includes('first goal') || crit.includes('first goal')) && 
+                   !name.includes('player') && !crit.includes('player');
+        }
+    },
+    {
+        code: MarketCodes.ASIAN_TOTAL,
+        priority: 103,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match "Asian Total" markets (full match, not 1st half)
+            return (name.includes('asian total') && !name.includes('1st half')) || 
+                   (crit.includes('asian total') && !crit.includes('1st half'));
+        }
+    },
+    {
+        code: MarketCodes.ASIAN_TOTAL_1ST_HALF,
+        priority: 102,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match "Asian Total - 1st Half" markets
+            return (name.includes('asian total') && name.includes('1st half')) || 
+                   (crit.includes('asian total') && crit.includes('1st half'));
+        }
+    },
+    {
+        code: MarketCodes.THREE_WAY_HANDICAP_1ST_HALF,
+        priority: 101,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match "3-Way Handicap - 1st Half" markets
+            return (name.includes('3-way handicap') && name.includes('1st half')) || 
+                   (crit.includes('3-way handicap') && crit.includes('1st half'));
+        }
+    },
+    {
+        code: MarketCodes.TEAM_OFFSIDES_BY,
+        priority: 100,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match team-specific offsides markets (e.g., "Total Offsides by Atlético Mineiro-MG")
+            return (name.includes('offsides by') || crit.includes('offsides by')) && 
+                   !name.includes('player');
+        }
+    },
+    {
+        code: MarketCodes.TOTAL_OFFSIDES,
+        priority: 99,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match "Total Offsides" markets
+            return (name.includes('total offsides') || crit.includes('total offsides')) && 
+                   !name.includes('player') && !name.includes('offsides by');
+        }
+    },
+    {
+        code: MarketCodes.MOST_SHOTS_ON_TARGET,
+        priority: 98,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match "Most Shots on Target" markets
+            return (name.includes('most shots on target') || crit.includes('most shots on target')) && 
+                   !name.includes('player');
+        }
+    },
+    {
+        code: MarketCodes.TEAM_SHOTS_ON_TARGET_BY,
+        priority: 97,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match team-specific shots on target markets (e.g., "Total Shots on Target by Atlético Mineiro-MG")
+            return (name.includes('shots on target by') || crit.includes('shots on target by')) && 
+                   !name.includes('player');
+        }
+    },
+    {
+        code: MarketCodes.TEAM_SHOTS_OU,
+        priority: 95,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match team-specific shots markets (e.g., "Total Shots by Club Bolívar")
+            return (name.includes('shots by') || crit.includes('shots by')) && 
+                   !name.includes('player') && 
+                   !name.includes('shots on target');
+        }
+    },
+    {
+        code: MarketCodes.TEAM_TOTAL_SHOTS_OU,
+        priority: 90,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            return name.includes('total shots') && !name.includes('player') && !name.includes('shots on target') && !name.includes('shots by');
+        }
+    },
+    {
+        code: MarketCodes.TEAM_SHOTS_ON_TARGET_OU,
+        priority: 96,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            return name.includes('total shots on target') && !name.includes('player');
         }
     },
     {
@@ -282,6 +418,15 @@ export const MARKET_REGISTRY = [
     },
 
     {
+        code: MarketCodes.TEAM_RED_CARD,
+        priority: 14,
+        match: (bet, norm) => {
+            const n = norm.marketNameLower;
+            return n.includes('given a red card') || n.includes('team given a red card');
+        }
+    },
+
+    {
         code: MarketCodes.FIRST_GOAL_SCORER,
         priority: 12,
         match: (bet, norm) => {
@@ -345,11 +490,72 @@ export const MARKET_REGISTRY = [
     },
 
     {
+        code: MarketCodes.PENALTY_KICK_AWARDED,
+        priority: 95,
+        match: (bet, norm) => {
+            const n = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            return (n.includes('penalty kick awarded') || crit.includes('penalty kick awarded'));
+        }
+    },
+
+    {
+        code: MarketCodes.TEAM_SCORE_FROM_PENALTY,
+        priority: 94,
+        match: (bet, norm) => {
+            const n = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            return (n.includes('to score from a penalty') || crit.includes('to score from a penalty')) && 
+                   !n.includes('player') && !crit.includes('player');
+        }
+    },
+
+    {
+        code: MarketCodes.OWN_GOAL,
+        priority: 93,
+        match: (bet, norm) => {
+            const n = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            return (n.includes('own goal') || crit.includes('own goal'));
+        }
+    },
+
+    {
         code: MarketCodes.HALF_TIME,
         priority: 15,
         match: (bet, norm) => {
             const n = norm.marketNameLower;
             return n.includes('half time') && !n.includes('total') && !n.includes('goals');
+        }
+    },
+
+    {
+        code: MarketCodes.DOUBLE_CHANCE_2ND_HALF,
+        priority: 14,
+        match: (bet, norm) => {
+            const n = norm.marketNameLower;
+            return n.includes('double chance') && n.includes('2nd half');
+        }
+    },
+
+    {
+        code: MarketCodes.DOUBLE_CHANCE_1ST_HALF,
+        priority: 13,
+        match: (bet, norm) => {
+            const n = norm.marketNameLower;
+            return n.includes('double chance') && n.includes('1st half');
+        }
+    },
+
+    {
+        code: MarketCodes.WIN_TO_NIL,
+        priority: 85,
+        match: (bet, norm) => {
+            const name = norm.marketNameLower;
+            const crit = norm.criterionLower;
+            // Match "Win to Nil" markets - both in market name and criterion
+            return (name.includes('win to nil') || crit.includes('win to nil')) && 
+                   !name.includes('player') && !crit.includes('player');
         }
     },
 
