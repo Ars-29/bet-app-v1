@@ -25,9 +25,11 @@ export function loadLeagueMapping() {
     // #endregion
     
     // Path to the CSV file - try multiple possible locations
+    // Priority: client folder (for Vercel deployment) > root > server folder
     const possiblePaths = [
-      path.join(process.cwd(), 'server/src/unibet-calc/league_mapping_clean.csv'), // From client to server
-      path.join(process.cwd(), 'league_mapping_clean.csv'), // Root directory
+      path.join(process.cwd(), 'league_mapping_clean.csv'), // Client folder (for Vercel)
+      path.join(process.cwd(), '..', 'league_mapping_clean.csv'), // Root directory
+      path.join(process.cwd(), 'server/src/unibet-calc/league_mapping_clean.csv'), // Server folder (local dev)
       path.join(process.cwd(), '..', 'server/src/unibet-calc/league_mapping_clean.csv'), // Alternative path
     ];
     
