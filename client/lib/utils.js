@@ -19,13 +19,17 @@ export const parseSportsMonksTime = (dateTime) => {
     if (typeof dateTime === 'string') {
       // Handle different formats
       if (dateTime.includes('T')) {
-        // ISO format with timezone
+        // ISO format with timezone (e.g., "2025-01-15T10:30:00Z" or "2025-01-15T10:30:00+00:00")
         parsedDate = new Date(dateTime);
-      } else if (dateTime.includes('Z') || dateTime.includes('+')) {
-        // Already has timezone info
+      } else if (dateTime.includes('Z') || dateTime.includes('+') || dateTime.includes('-', 10)) {
+        // Already has timezone info or is ISO-like
         parsedDate = new Date(dateTime);
+      } else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateTime)) {
+        // Format: "2025-07-16 09:00:00" -> convert to ISO format for better mobile compatibility
+        // Replace space with 'T' and add 'Z' for UTC
+        parsedDate = new Date(dateTime.replace(' ', 'T') + 'Z');
       } else {
-        // Format: "2025-07-16 09:00:00" -> treat as UTC
+        // Try adding UTC as fallback
         parsedDate = new Date(dateTime + ' UTC');
       }
     } else if (dateTime instanceof Date) {

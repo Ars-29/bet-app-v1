@@ -117,19 +117,30 @@ const UpcomingMatchesPage = () => {
         });
       }
       
-      // Format start time - ensure it's in the expected format
+      // Format start time - keep as ISO string for proper parsing
       let startTime = match.start || match.starting_at;
       
-      // If startTime is an ISO string, convert it to the expected format
+      // Ensure startTime is in a valid format that can be parsed
       if (startTime && typeof startTime === 'string') {
         try {
           const date = new Date(startTime);
           if (!isNaN(date.getTime())) {
-            // Format as "YYYY-MM-DD HH:MM:SS" for MatchListPage compatibility
-            startTime = date.toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
+            // Keep as ISO string format for proper parsing by formatToLocalTime
+            // This ensures mobile browsers can parse it correctly
+            startTime = date.toISOString();
+          } else {
+            console.warn('Invalid start time format:', startTime);
+            startTime = null;
           }
         } catch (e) {
-          console.warn('Invalid start time format:', startTime);
+          console.warn('Error parsing start time:', startTime, e);
+          startTime = null;
+        }
+      } else if (startTime && startTime instanceof Date) {
+        // If it's already a Date object, convert to ISO string
+        if (!isNaN(startTime.getTime())) {
+          startTime = startTime.toISOString();
+        } else {
           startTime = null;
         }
       }
