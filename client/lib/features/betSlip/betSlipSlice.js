@@ -42,36 +42,22 @@ const betSlipSlice = createSlice({
       } = action.payload;
 
 
-      // Check if bet already exists (same oddId) or same market bet exists (same match + marketId)
-      // For combination bets, we allow multiple selections from the same market (1X2)
+      // ✅ UPDATED: Only check for exact duplicate bets (same oddId)
+      // Multiple single bets on same match/market/selection are now allowed
+      // Conflicting selections (e.g., Home vs Away) are also allowed as separate single bets
       const existingBetIndex = state.bets.findIndex(
         (bet) => {
-          // Same exact bet (same oddId) - always conflict
+          // Only check for exact duplicate (same oddId) - allow everything else
           if (bet.oddId === oddId) return true;
-          
-          // Only check market conflicts if both bets have valid marketIds and they're the same
-          if (bet.match.id === match.id && 
-              bet.marketId && 
-              marketId && 
-              bet.marketId === marketId &&
-              !(typeof marketId === 'string' && marketId.includes('_'))) {
-            return true;
-          }
-          
           return false;
         }
       );
 
-      // If same market bet exists, don't add it (only for non-combination markets)
+      // If exact duplicate exists, update it instead of adding new
       if (existingBetIndex >= 0) {
         const existingBet = state.bets[existingBetIndex];
         if (existingBet.oddId === oddId) {
           // Same exact bet, update it
-        } else if (existingBet.marketId && marketId && existingBet.marketId === marketId && 
-                   !(typeof marketId === 'string' && marketId.includes('_'))) {
-          // Same market bet exists for non-combination markets, don't add
-          state.lastError = "You already have a bet on this market for this match";
-          return; // Exit early, don't add the bet
         }
       }
 
@@ -133,7 +119,48 @@ const betSlipSlice = createSlice({
               (p.position && p.position.toLowerCase() === 'away') || p.home === false
             )?.name || match.participants[1]?.name) : 'Team 2'),
           competition: match.competition || match.league?.name || "Football",
-          time: match.time || match.startTime || (match.starting_at ? match.starting_at.split(' ')[1].slice(0, 5) : ''),
+          time: (() => {
+            // Helper function to safely extract time from different date formats
+            if (match.time) return match.time;
+            if (match.startTime) return match.startTime;
+            if (!match.starting_at) return '';
+            
+            try {
+              // Handle ISO format: "2025-01-15T10:30:00Z" or "2025-01-15T10:30:00"
+              if (match.starting_at.includes('T')) {
+                const date = new Date(match.starting_at);
+                if (!isNaN(date.getTime())) {
+                  return date.toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                  });
+                }
+              }
+              
+              // Handle space-separated format: "2025-01-15 10:30:00"
+              if (match.starting_at.includes(' ')) {
+                const timePart = match.starting_at.split(' ')[1];
+                if (timePart) {
+                  return timePart.slice(0, 5); // Extract HH:MM
+                }
+              }
+              
+              // Fallback: try to parse as Date
+              const date = new Date(match.starting_at);
+              if (!isNaN(date.getTime())) {
+                return date.toLocaleTimeString('en-US', { 
+                  hour: 'numeric', 
+                  minute: '2-digit',
+                  hour12: true 
+                });
+              }
+            } catch (error) {
+              console.warn('Error extracting time from starting_at:', match.starting_at, error);
+            }
+            
+            return '';
+          })(),
           isLive: match.isLive || false,
           name: match.name || `${match.team1 || ''} vs ${match.team2 || ''}`,
           starting_at: match.starting_at, // Keep for inplay calculation

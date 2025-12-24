@@ -946,53 +946,10 @@ class BetService {
     // Handle single bets
     console.log(`[placeBet] Processing single bet for matchId: ${matchId}, oddId: ${oddId}`);
     
-    // Validate: Check if user has a pending bet for the same market and match
-    // This restriction only applies to single bets, not combination bets
-    const marketName = unibetMetaPayload?.marketName || clientBetDetails?.market_name || clientBetDetails?.market_description;
-    
-    if (marketName) {
-      console.log(`[placeBet] Checking for existing pending bets on market: ${marketName}, match: ${matchId}`);
-      
-      // Find pending bets for the same user, match, and market (single bets only, not combination)
-      const existingPendingBet = await Bet.findOne({
-        $and: [
-          {
-            userId: userId,
-            matchId: matchId,
-            status: 'pending'
-          },
-          {
-            // Ensure it's a single bet (not a combination bet) - combination field should not exist or be empty
-            $or: [
-              { combination: { $exists: false } },
-              { combination: { $size: 0 } },
-              { combination: null }
-            ]
-          },
-          {
-            // Check market name in multiple possible locations
-            $or: [
-              { 'unibetMeta.marketName': marketName },
-              { 'betDetails.market_name': marketName },
-              { 'betDetails.market_description': marketName },
-              { marketName: marketName }
-            ]
-          }
-        ]
-      });
-      
-      if (existingPendingBet) {
-        console.log(`[placeBet] ❌ User already has a pending bet for market "${marketName}" on match ${matchId}`);
-        console.log(`[placeBet] Existing bet ID: ${existingPendingBet._id}, betOption: ${existingPendingBet.betOption}`);
-        throw new CustomError(
-          `You already have a pending bet for "${marketName}" on this match. Please wait for the result or cancel the existing bet.`,
-          400,
-          "DUPLICATE_MARKET_BET"
-        );
-      }
-      
-      console.log(`[placeBet] ✅ No existing pending bet found for market "${marketName}" on match ${matchId}`);
-    }
+    // ✅ UPDATED: Removed market conflict validation for single bets
+    // Multiple single bets on same match/market/selection are now allowed
+    // Conflicting selections (e.g., Home vs Away) are also allowed as separate single bets
+    console.log(`[placeBet] ✅ Single bet - no restrictions on same match/market/selection`);
     
     // Check for team restrictions: If user won a bet on a team in last 7 days, block betting on ANY market for that team's matches
     const homeName = unibetMetaPayload?.homeName;

@@ -37,38 +37,40 @@ export const preventConflictingBet = async (req, res, next) => {
         });
       }
       
-      // For combination bets, we'll use a more flexible market key
+      // For combination bets, use market_id from betDetails to properly identify markets
       if (isCombinationBetRequest) {
-        // Use oddId as market identifier for combination bets since betDetails isn't available yet
-        bet.__marketKey = bet.oddId || bet.betOption || bet.selection || 'unknown';
+        // Use market_id from betDetails (available in combinationData) to identify the market
+        bet.__marketKey = bet.betDetails?.market_id || bet.marketId || bet.betDetails?.market_name || bet.betDetails?.market_description || bet.oddId || 'unknown';
       } else {
         bet.__marketKey = String(inferredMarketKey);
       }
     }
 
-    // Check for conflicts within the current request (same matchId + marketId in multiple bets)
-    const seenCombos = new Set();
-    const seenMatchIds = new Set();
-    
-    for (const bet of betsToCheck) {
-      const matchId = bet.matchId;
-      const marketKey = bet.__marketKey || bet.marketId || (bet.betDetails && bet.betDetails.market_id);
-      const comboKey = `${matchId}:${marketKey}`;
+    // ✅ UPDATED: For combination bets, validate only one selection per match (block same match completely)
+    // For single bets, no restrictions on same match/market/selection
+    if (isCombinationBetRequest) {
+      // Track matches to ensure each match appears only once in combination
+      const seenMatches = new Set();
       
-      // Check for duplicate match + market combinations
-      if (seenCombos.has(comboKey)) {
-        console.log('[conflictingBet] Conflict within request:', comboKey);
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Conflicting bets within the current request (same match and market).' 
-        });
+      for (const bet of betsToCheck) {
+        const matchId = bet.matchId;
+        
+        // Check if this match already exists in the combination
+        if (seenMatches.has(matchId)) {
+          console.log('[conflictingBet] ❌ Combination bet has duplicate match:', matchId);
+          return res.status(400).json({ 
+            success: false, 
+            message: 'In a combination bet, each match can only be used once. This match is already included in the combination.' 
+          });
+        }
+        
+        // Mark this match as seen
+        seenMatches.add(matchId);
       }
-      seenCombos.add(comboKey);
       
-      // Allow combination bets from the same match (different markets)
-      // Only check for duplicate match + market combinations (handled above)
-      seenMatchIds.add(matchId); // Still add to track, but don't block
+      console.log('[conflictingBet] ✅ Combination bet validation passed - one selection per match');
     }
+    // For single bets, no validation needed - allow multiple bets on same match/market/selection
 
     // Check for conflicts with existing pending bets in the DB
     if (isCombinationBetRequest) {
@@ -143,36 +145,11 @@ export const preventConflictingBet = async (req, res, next) => {
         }
       }
     } else {
-      // For single bets, check conflicts with other single bets only
-      for (const bet of betsToCheck) {
-        const matchId = bet.matchId;
-        const marketKey = bet.__marketKey || bet.marketId || (bet.betDetails && bet.betDetails.market_id);
-        
-        console.log('[conflictingBet] Checking for conflicts with:', { matchId, marketKey });
-        // For single bets, check conflicts with other single bets only
-        // Allow single bets to coexist with combination bets
-        // Use oddId as the primary conflict identifier since it's unique per market+selection
-        const existingSingleBet = await Bet.findOne({
-          userId,
-          matchId,
-          status: 'pending',
-          // Ensure it's not a combination bet
-          $or: [
-            { combination: { $exists: false } },
-            { combination: { $size: 0 } }
-          ],
-          // Use oddId as the primary conflict identifier
-          oddId: bet.oddId
-        });
-
-        if (existingSingleBet) {
-          console.log('[conflictingBet] Found conflicting single bet:', existingSingleBet._id);
-          return res.status(400).json({ 
-            success: false, 
-            message: 'You already have a pending bet on this market for this match.' 
-          });
-        }
-      }
+      // ✅ UPDATED: For single bets, allow multiple bets on same match/market/selection
+      // Only check for exact duplicate (same oddId) - but even that can be allowed if needed
+      // Multiple single bets with conflicting selections (e.g., Home vs Away) are now allowed
+      console.log('[conflictingBet] ✅ Single bet - no restrictions on same match/market/selection');
+      // No validation needed - allow all single bets
     }
 
     console.log('[conflictingBet] No conflicts found, proceeding with bet placement');
