@@ -51,17 +51,17 @@ export const preventConflictingBet = async (req, res, next) => {
     if (isCombinationBetRequest) {
       // Track matches to ensure each match appears only once in combination
       const seenMatches = new Set();
+    
+    for (const bet of betsToCheck) {
+      const matchId = bet.matchId;
       
-      for (const bet of betsToCheck) {
-        const matchId = bet.matchId;
-        
         // Check if this match already exists in the combination
         if (seenMatches.has(matchId)) {
           console.log('[conflictingBet] ❌ Combination bet has duplicate match:', matchId);
-          return res.status(400).json({ 
-            success: false, 
+        return res.status(400).json({ 
+          success: false, 
             message: 'In a combination bet, each match can only be used once. This match is already included in the combination.' 
-          });
+        });
         }
         
         // Mark this match as seen
@@ -137,8 +137,8 @@ export const preventConflictingBet = async (req, res, next) => {
           if (allNewLegsPresent && newCombinationLegs.size < existingCombinationLegs.size) {
             // New combination is a SUBSET - BLOCK
             console.log('[conflictingBet] ❌ New combination is a subset of existing combination', existingBet._id);
-            return res.status(400).json({ 
-              success: false, 
+          return res.status(400).json({ 
+            success: false, 
               message: 'You already have a pending combination bet that includes these selections.' 
             });
           }

@@ -3,6 +3,7 @@ import BetService from "../services/bet.service.js";
 import LiveFixturesService from "../services/LiveFixtures.service.js";
 import { UnibetCalcController } from "../controllers/unibetCalc.controller.js";
 import { FotmobController } from "../controllers/fotmob.controller.js";
+import LeagueMappingAutoUpdate from "../services/leagueMappingAutoUpdate.service.js";
 
 // Get LiveFixtures service instance
 const getLiveFixturesService = () => {
@@ -20,6 +21,7 @@ let inplayMatchesJobScheduled = false;
 let homepageCacheJobScheduled = false;
 let betProcessingJobScheduled = false;
 let fotmobCacheJobScheduled = false;
+let leagueMappingJobScheduled = false;
 
 // Function to schedule live odds job
 const scheduleLiveOddsJob = async () => {
@@ -115,17 +117,26 @@ const scheduleFotmobCacheJob = async () => {
     try {
       // Schedule at 11:00 PM Pakistan Time (UTC+5) = 6:00 PM UTC (18:00 UTC)
       // Cron syntax: "minute hour dayOfMonth month dayOfWeek"
-      // "0 18 * * *" = 6:00 PM UTC every day (which is 11:00 PM PKT)
+      // TESTING: Schedule at 8:50 PM Pakistan Time (LOCAL)
+      // Cron syntax: "minute hour dayOfMonth month dayOfWeek"
+      // NOTE: Agenda.js interprets cron in SERVER'S LOCAL TIMEZONE (PKT = UTC+5)
+      // "50 20 * * *" = 8:50 PM PKT (LOCAL) = 3:50 PM UTC
+      // TODO: Change back to "0 23 * * *" for production (11:00 PM PKT LOCAL TIME)
       console.log('[Agenda] ========================================');
       console.log('[Agenda] Scheduling FotMob cache refresh job...');
-      console.log('[Agenda] Time: 11:00 PM PKT (6:00 PM UTC)');
-      console.log('[Agenda] Cron: "0 18 * * *"');
+      console.log('[Agenda] ⚠️ TESTING MODE: Time: 8:50 PM PKT (LOCAL TIME)');
+      console.log('[Agenda] Cron: "50 20 * * *"');
+      console.log('[Agenda] NOTE: Cron uses server local timezone (PKT)');
       console.log('[Agenda] ========================================');
       
-      const scheduledJob = await agenda.every("0 18 * * *", "refreshFotmobMultidayCache");
+      const scheduledJob = await agenda.every("50 20 * * *", "refreshFotmobMultidayCache");
       
       if (scheduledJob) {
-        const nextRunPKT = scheduledJob.attrs.nextRunAt ? new Date(scheduledJob.attrs.nextRunAt.getTime() + (5 * 60 * 60 * 1000)).toISOString().replace('Z', ' PKT') : 'N/A';
+        const nextRunPKT = scheduledJob.attrs.nextRunAt ? (() => {
+          const pktDate = new Date(scheduledJob.attrs.nextRunAt);
+          pktDate.setUTCHours(pktDate.getUTCHours() + 5); // Add 5 hours for PKT
+          return pktDate.toISOString().replace('Z', ' PKT');
+        })() : 'N/A';
         console.log('[Agenda] ✅ FotMob cache refresh job scheduled successfully!');
         console.log(`[Agenda] Job ID: ${scheduledJob.attrs._id}`);
         console.log(`[Agenda] Next run (UTC): ${scheduledJob.attrs.nextRunAt}`);
@@ -150,6 +161,99 @@ const cancelFotmobCacheJob = async () => {
   await agenda.cancel({ name: 'refreshFotmobMultidayCache' });
   fotmobCacheJobScheduled = false;
   console.log('[Agenda] FotMob multi-day cache refresh job cancelled successfully');
+};
+
+// Function to schedule League Mapping auto-update job
+const scheduleLeagueMappingJob = async () => {
+  console.log(`[Agenda] scheduleLeagueMappingJob called. Flag status: leagueMappingJobScheduled = ${leagueMappingJobScheduled}`);
+  
+  if (!leagueMappingJobScheduled) {
+    try {
+      // TESTING: Schedule at 8:35 PM Pakistan Time (LOCAL)
+      // Cron syntax: "minute hour dayOfMonth month dayOfWeek"
+      // NOTE: Agenda.js interprets cron in SERVER'S LOCAL TIMEZONE (PKT = UTC+5)
+      // "35 20 * * *" = 8:35 PM PKT (LOCAL) = 3:35 PM UTC
+      // TODO: Change back to "0 9 * * *" for production (9:00 AM PKT LOCAL TIME)
+      console.log('[Agenda] ========================================');
+      console.log('[Agenda] Scheduling League Mapping auto-update job...');
+      console.log('[Agenda] ⚠️ TESTING MODE: Time: 8:35 PM PKT (LOCAL TIME)');
+      console.log('[Agenda] Cron: "35 20 * * *"');
+      console.log('[Agenda] NOTE: Cron uses server local timezone (PKT)');
+      console.log('[Agenda] ========================================');
+      
+      console.log('[Agenda] About to call agenda.every() for updateLeagueMapping...');
+      const scheduledJob = await agenda.every("35 20 * * *", "updateLeagueMapping");
+      console.log('[Agenda] agenda.every() returned:', scheduledJob ? 'Job object' : 'null/undefined');
+      
+      if (scheduledJob) {
+        const nextRunUTC = scheduledJob.attrs.nextRunAt;
+        const nextRunPKT = nextRunUTC ? (() => {
+          const pktDate = new Date(nextRunUTC);
+          pktDate.setUTCHours(pktDate.getUTCHours() + 5); // Add 5 hours for PKT
+          return pktDate.toISOString().replace('Z', ' PKT');
+        })() : 'N/A';
+        const now = new Date();
+        const nowPKT = (() => {
+          const pktDate = new Date(now);
+          pktDate.setUTCHours(pktDate.getUTCHours() + 5); // Add 5 hours for PKT
+          return pktDate.toISOString().replace('Z', ' PKT');
+        })();
+        
+        console.log('[Agenda] ✅ League Mapping auto-update job scheduled successfully!');
+        console.log(`[Agenda] Job ID: ${scheduledJob.attrs._id}`);
+        console.log(`[Agenda] Current time (UTC): ${now.toISOString()}`);
+        console.log(`[Agenda] Current time (PKT): ${nowPKT}`);
+        console.log(`[Agenda] Next run (UTC): ${nextRunUTC}`);
+        console.log(`[Agenda] Next run (PKT): ${nextRunPKT}`);
+        console.log(`[Agenda] Repeat interval: ${scheduledJob.attrs.repeatInterval}`);
+        console.log(`[Agenda] Job type: ${scheduledJob.attrs.type}`);
+        console.log(`[Agenda] Job data:`, JSON.stringify(scheduledJob.attrs.data || {}, null, 2));
+        
+        // Verify job will actually run
+        if (nextRunUTC) {
+          const timeUntilRun = nextRunUTC.getTime() - now.getTime();
+          const minutesUntil = Math.floor(timeUntilRun / (1000 * 60));
+          const secondsUntil = Math.floor((timeUntilRun % (1000 * 60)) / 1000);
+          console.log(`[Agenda] ⏰ Time until next run: ${minutesUntil}m ${secondsUntil}s`);
+          
+          if (timeUntilRun < 0) {
+            console.warn(`[Agenda] ⚠️ WARNING: Next run time is in the past! Job may not execute until tomorrow.`);
+            console.warn(`[Agenda] ⚠️ Time difference: ${Math.abs(timeUntilRun / 1000)} seconds in the past`);
+          } else if (timeUntilRun < 60000) {
+            console.log(`[Agenda] ✅ Job will run in less than 1 minute!`);
+          }
+        }
+        
+        // Verify job exists in database
+        try {
+          const verifyJob = await agenda.jobs({ name: 'updateLeagueMapping' });
+          console.log(`[Agenda] 🔍 Verification: Found ${verifyJob.length} updateLeagueMapping job(s) in database`);
+          if (verifyJob.length > 0) {
+            verifyJob.forEach((job, index) => {
+              const verifyNextRun = job.attrs.nextRunAt;
+              const verifyNextRunPKT = verifyNextRun ? (() => {
+                const pktDate = new Date(verifyNextRun);
+                pktDate.setUTCHours(pktDate.getUTCHours() + 5); // Add 5 hours for PKT
+                return pktDate.toISOString().replace('Z', ' PKT');
+              })() : 'N/A';
+              console.log(`[Agenda]   Job ${index + 1}: ID=${job.attrs._id}, Next run (PKT)=${verifyNextRunPKT}`);
+            });
+          }
+        } catch (verifyError) {
+          console.warn(`[Agenda] ⚠️ Could not verify job in database:`, verifyError.message);
+        }
+        
+        leagueMappingJobScheduled = true;
+      } else {
+        console.error('[Agenda] ❌ Failed to schedule League Mapping job - no job returned');
+      }
+    } catch (error) {
+      console.error('[Agenda] ❌ Error scheduling League Mapping job:', error);
+      console.error('[Agenda] Error details:', error.stack);
+    }
+  } else {
+    console.log('[Agenda] ⚠️ League Mapping job already scheduled, skipping...');
+  }
 };
 
 // Function to check fixture cache and manage jobs accordingly
@@ -183,13 +287,16 @@ export const checkFixtureCacheAndManageJobs = async () => {
   
   console.log('[Agenda] SportsMonks API jobs disabled - no continuous API calls will be made');
   
-  // ALWAYS schedule automated bet processing and FotMob cache refresh
+  // ALWAYS schedule automated bet processing, FotMob cache refresh, and League Mapping update
   // These jobs don't depend on liveFixturesService, so they should always be scheduled
   console.log('[Agenda] Scheduling automated bet processing job...');
   await scheduleBetProcessingJob();
   
   console.log('[Agenda] Scheduling FotMob multi-day cache refresh job...');
   await scheduleFotmobCacheJob();
+  
+  console.log('[Agenda] Scheduling League Mapping auto-update job...');
+  await scheduleLeagueMappingJob();
 };
 
 // Function to check if there are live matches in cache
@@ -315,6 +422,57 @@ agenda.define("processPendingBets", async (job) => {
   }
 });
 
+// Define League Mapping auto-update job
+agenda.define("updateLeagueMapping", async (job) => {
+  const now = new Date();
+  const utcTime = now.toISOString();
+  // Convert to Pakistan time (UTC+5)
+  const pktTime = new Date(now.getTime() + (5 * 60 * 60 * 1000)).toISOString().replace('Z', ' PKT');
+  
+  console.log(`[Agenda] ========================================`);
+  console.log(`[Agenda] 🕐 League Mapping Auto-Update Job STARTED`);
+  console.log(`[Agenda] ========================================`);
+  console.log(`[Agenda] UTC Time: ${utcTime}`);
+  console.log(`[Agenda] Pakistan Time: ${pktTime}`);
+  console.log(`[Agenda] Job ID: ${job.attrs._id}`);
+  console.log(`[Agenda] Scheduled time: ${job.attrs.nextRunAt}`);
+  
+  try {
+    const updater = new LeagueMappingAutoUpdate();
+    const result = await updater.execute();
+    
+    const endTime = new Date();
+    const endUtcTime = endTime.toISOString();
+    const endPktTime = new Date(endTime.getTime() + (5 * 60 * 60 * 1000)).toISOString().replace('Z', ' PKT');
+    const duration = ((endTime.getTime() - now.getTime()) / 1000).toFixed(2);
+    
+    console.log(`[Agenda] ========================================`);
+    console.log(`[Agenda] ✅ League Mapping Auto-Update Job COMPLETED`);
+    console.log(`[Agenda] ========================================`);
+    console.log(`[Agenda] Completed at UTC: ${endUtcTime}`);
+    console.log(`[Agenda] Completed at PKT: ${endPktTime}`);
+    console.log(`[Agenda] Duration: ${duration} seconds`);
+    console.log(`[Agenda] Result:`, JSON.stringify(result, null, 2));
+    console.log(`[Agenda] ========================================`);
+    console.log(''); // Empty line to ensure logs don't get stuck
+    
+    // Return result directly, don't wrap in Promise.resolve
+    return result;
+  } catch (error) {
+    console.error(`[Agenda] ========================================`);
+    console.error(`[Agenda] ❌ League Mapping Auto-Update Job FAILED`);
+    console.error(`[Agenda] ========================================`);
+    console.error(`[Agenda] Error at UTC: ${utcTime}`);
+    console.error(`[Agenda] Error at PKT: ${pktTime}`);
+    console.error(`[Agenda] Error:`, error);
+    console.error(`[Agenda] Stack:`, error.stack);
+    console.error(`[Agenda] ========================================\n`);
+    
+    // Re-throw to let Agenda handle it
+    throw error;
+  }
+});
+
 // Define FotMob multi-day cache refresh job
 agenda.define("refreshFotmobMultidayCache", async (job) => {
   const now = new Date();
@@ -381,6 +539,12 @@ export const initializeAgendaJobs = async () => {
   
   try {
     agendaJobsInitialized = true; // Set flag immediately to prevent race conditions
+    
+    // Reset scheduling flags to allow fresh scheduling
+    betProcessingJobScheduled = false;
+    fotmobCacheJobScheduled = false;
+    leagueMappingJobScheduled = false;
+    
     console.log('[Agenda] 🔄 Starting Agenda...');
     await agenda.start();
     console.log('[Agenda] ✅ Agenda started successfully');
@@ -407,6 +571,8 @@ export const initializeAgendaJobs = async () => {
     await agenda.cancel({ name: 'processPendingBets' });
     const cancelledFotmob = await agenda.cancel({ name: 'refreshFotmobMultidayCache' });
     console.log(`[Agenda] Cancelled FotMob cache jobs: ${cancelledFotmob} jobs removed`);
+    const cancelledLeagueMapping = await agenda.cancel({ name: 'updateLeagueMapping' });
+    console.log(`[Agenda] Cancelled League Mapping jobs: ${cancelledLeagueMapping} jobs removed`);
     await agenda.cancel({ name: 'checkBetOutcome' }); // Cancel old bet outcome jobs
     
     // Remove any remaining jobs
@@ -507,9 +673,62 @@ export const initializeAgendaJobs = async () => {
           console.log(`[Agenda]    - Time until next run: ${hoursUntil}h ${minsUntil}m`);
         }
       }
+      
+      // Special logging for League Mapping job
+      if (name === 'updateLeagueMapping') {
+        console.log(`[Agenda] 🗺️ League Mapping Job Status:`);
+        console.log(`[Agenda]    - Scheduled: ${leagueMappingJobScheduled ? 'YES ✅' : 'NO ❌'}`);
+        if (info.nextRun) {
+          const now = new Date();
+          const timeUntilNext = info.nextRun.getTime() - now.getTime();
+          const hoursUntil = Math.floor(timeUntilNext / (1000 * 60 * 60));
+          const minsUntil = Math.floor((timeUntilNext % (1000 * 60 * 60)) / (1000 * 60));
+          console.log(`[Agenda]    - Time until next run: ${hoursUntil}h ${minsUntil}m`);
+        }
+      }
     });
     
     console.log(`[Agenda] ========================================\n`);
+    
+    // Add job status checker for debugging (runs every 30 seconds)
+    const checkJobStatus = async () => {
+      try {
+        const jobs = await agenda.jobs({ name: 'updateLeagueMapping' });
+        if (jobs.length > 0) {
+          jobs.forEach((job, index) => {
+            const nextRunUTC = job.attrs.nextRunAt;
+            const nextRunPKT = nextRunUTC ? (() => {
+              const pktDate = new Date(nextRunUTC);
+              pktDate.setUTCHours(pktDate.getUTCHours() + 5); // Add 5 hours for PKT
+              return pktDate.toISOString().replace('Z', ' PKT');
+            })() : 'N/A';
+            const now = new Date();
+            const timeUntil = nextRunUTC ? nextRunUTC.getTime() - now.getTime() : null;
+            const minutesUntil = timeUntil ? Math.floor(timeUntil / (1000 * 60)) : null;
+            const secondsUntil = timeUntil ? Math.floor((timeUntil % (1000 * 60)) / 1000) : null;
+            
+            console.log(`[Agenda] 📊 Job Status Check - updateLeagueMapping #${index + 1}:`);
+            console.log(`[Agenda]   - Job ID: ${job.attrs._id}`);
+            console.log(`[Agenda]   - Next run (PKT): ${nextRunPKT}`);
+            console.log(`[Agenda]   - Time until run: ${timeUntil ? (minutesUntil + 'm ' + secondsUntil + 's') : 'N/A'}`);
+            console.log(`[Agenda]   - Locked: ${job.attrs.lockedAt ? 'YES (running)' : 'NO (idle)'}`);
+            console.log(`[Agenda]   - Last run: ${job.attrs.lastRunAt ? new Date(job.attrs.lastRunAt).toISOString() : 'Never'}`);
+            console.log(`[Agenda]   - Repeat interval: ${job.attrs.repeatInterval || 'N/A'}`);
+          });
+        } else {
+          console.log('[Agenda] ⚠️ No updateLeagueMapping jobs found in database!');
+        }
+      } catch (error) {
+        console.error('[Agenda] Error checking job status:', error.message);
+      }
+    };
+    
+    // Check job status every 30 seconds (for debugging)
+    console.log('[Agenda] 🔍 Starting job status checker (every 30 seconds)...');
+    setInterval(checkJobStatus, 30000);
+    
+    // Run initial check after 5 seconds
+    setTimeout(checkJobStatus, 5000);
     
   } catch (error) {
     agendaJobsInitialized = false; // Reset flag on error so it can be retried
@@ -562,17 +781,25 @@ export const setupAgendaListeners = () => {
     console.log(`[Agenda] ========================================\n`);
   });
 
+  agenda.on("start:updateLeagueMapping", (job) => {
+    console.log(`\n[Agenda] ========================================`);
+    console.log(`[Agenda] 🟢 Job "updateLeagueMapping" STARTING`);
+    console.log(`[Agenda] ⏰ Time: ${new Date().toISOString()}`);
+    console.log(`[Agenda] 📋 Job ID: ${job.attrs._id}`);
+    console.log(`[Agenda] ========================================\n`);
+  });
+
   // Generic job start handler for any other jobs
   agenda.on("start", (job) => {
     const jobName = job.attrs.name;
-    if (jobName !== 'processPendingBets' && jobName !== 'refreshFotmobMultidayCache') {
+    if (jobName !== 'processPendingBets' && jobName !== 'refreshFotmobMultidayCache' && jobName !== 'updateLeagueMapping') {
       console.log(`[Agenda] 🟢 Job "${jobName}" starting at ${new Date().toISOString()}`);
     }
   });
 
   agenda.on("complete", (job) => {
     const jobName = job.attrs.name;
-    if (jobName === 'processPendingBets' || jobName === 'refreshFotmobMultidayCache') {
+    if (jobName === 'processPendingBets' || jobName === 'refreshFotmobMultidayCache' || jobName === 'updateLeagueMapping') {
       console.log(`\n[Agenda] ========================================`);
       console.log(`[Agenda] ✅ Job "${jobName}" COMPLETED`);
       console.log(`[Agenda] ⏰ Time: ${new Date().toISOString()}`);

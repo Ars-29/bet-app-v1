@@ -144,15 +144,15 @@ const LiveMatchTimer = ({ matchId, initialTime = null, initialPeriod = null, isR
                         // Production networks can have delays causing stale data
                         if (apiTotalSeconds > currentTotalSeconds + 10) {
                             const newTime = {
-                                minute: matchClock.minute || 0,
-                                second: matchClock.second || 0
+                            minute: matchClock.minute || 0,
+                            second: matchClock.second || 0
                             };
                             setCurrentTime(newTime);
                             currentTimeRef.current = newTime;
-                            setCurrentPeriod(matchClock.period || '1st half');
-                            setIsLive(matchClock.running || false);
-                            setLastSyncTime(Date.now());
-                            
+                        setCurrentPeriod(matchClock.period || '1st half');
+                        setIsLive(matchClock.running || false);
+                        setLastSyncTime(Date.now());
+                        
                             console.log(`✅ LiveMatchTimer: Major sync - ${matchClock.minute}'${matchClock.second} ${matchClock.period} (running: ${matchClock.running})`);
                         } else if (!isInitializedRef.current) {
                             // First initialization - sync regardless
@@ -180,7 +180,7 @@ const LiveMatchTimer = ({ matchId, initialTime = null, initialPeriod = null, isR
 
         // Initial sync only if not initialized
         if (!isInitializedRef.current) {
-            syncWithAPI();
+        syncWithAPI();
         }
 
         // Set up periodic sync every 60 seconds (increased from 45s for production)

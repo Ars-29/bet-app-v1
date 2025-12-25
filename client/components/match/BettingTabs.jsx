@@ -2355,7 +2355,7 @@ const BettingOptionButton = ({
         return "bg-base hover:bg-base-dark";
     };
 
-        return (
+    return (
         <Button
             className={`group relative w-full px-1 min-[500px]:px-2 py-1 text-center transition-all duration-200 ${!isSuspended ? 'active:scale-[0.98]' : ''} betting-button ${getStyleClasses()} ${extraClassName} min-h-[32px] min-[400px]:min-h-[36px]`}
             onClick={handleBetClick}

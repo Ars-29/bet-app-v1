@@ -1301,7 +1301,7 @@ class BetOutcomeCalculator {
     /**
      * Calculate bet outcome based on detailed match information from Fotmob API
      */
-    calculateBetOutcome(bet, matchDetails) {
+    async calculateBetOutcome(bet, matchDetails) {
         if (!matchDetails) {
             console.log(`❌ No match details provided for bet calculation`);
             return {
@@ -5063,7 +5063,7 @@ class BetOutcomeCalculator {
             let playerId = null;
             if (participantName) {
                 console.log(`   - Looking up player ID by name: "${participantName}"`);
-                playerId = findPlayerIdByName(matchDetails, participantName);
+                playerId = await findPlayerIdByName(matchDetails, participantName);
                 console.log(`   - Found Player ID by name: ${playerId}`);
             }
             
@@ -5138,7 +5138,7 @@ class BetOutcomeCalculator {
             let foundPlayerId = null;
             if (participantName) {
                 console.log(`   - Looking up player ID by name: "${participantName}"`);
-                foundPlayerId = findPlayerIdByName(matchDetails, participantName);
+                foundPlayerId = await findPlayerIdByName(matchDetails, participantName);
                 console.log(`   - Found Player ID by name: ${foundPlayerId}`);
                 
                 // If we found a player by name, use that ID (it's more reliable)
@@ -5163,7 +5163,7 @@ class BetOutcomeCalculator {
                     // Try to find by name again as fallback
                     if (participantName && !foundPlayerId) {
                         console.log(`   - Retrying name lookup with different normalization...`);
-                        foundPlayerId = findPlayerIdByName(matchDetails, participantName);
+                        foundPlayerId = await findPlayerIdByName(matchDetails, participantName);
                         if (foundPlayerId) {
                             playerId = foundPlayerId;
                             console.log(`   - Found alternative player ID: ${playerId}`);
@@ -5290,7 +5290,7 @@ class BetOutcomeCalculator {
             let foundPlayerId = null;
             if (participantName) {
                 console.log(`   - Looking up player ID by name: "${participantName}"`);
-                foundPlayerId = findPlayerIdByName(matchDetails, participantName);
+                foundPlayerId = await findPlayerIdByName(matchDetails, participantName);
                 console.log(`   - Found Player ID by name: ${foundPlayerId}`);
                 
                 if (foundPlayerId) {
@@ -5420,7 +5420,7 @@ class BetOutcomeCalculator {
             console.log(`   - Final yesSelected: ${yesSelected}`);
             let playerId = bet.participantId;
             if (!playerId && participantName) {
-                playerId = findPlayerIdByName(matchDetails, participantName);
+                playerId = await findPlayerIdByName(matchDetails, participantName);
             }
             if (!playerId) {
                 return { status: 'cancelled', reason: 'Unable to resolve player for card market', debugInfo: { participantName } };
@@ -6538,7 +6538,7 @@ class BetOutcomeCalculator {
             let playerId = null;
             if (participantName) {
                 console.log(`   - Looking up player ID by name: "${participantName}"`);
-                playerId = findPlayerIdByName(matchDetails, participantName);
+                playerId = await findPlayerIdByName(matchDetails, participantName);
                 console.log(`   - Found Player ID by name: ${playerId}`);
             }
             
@@ -6638,7 +6638,7 @@ class BetOutcomeCalculator {
             let playerId = null;
             if (participantName) {
                 console.log(`   - Looking up player ID by name: "${participantName}"`);
-                playerId = findPlayerIdByName(matchDetails, participantName);
+                playerId = await findPlayerIdByName(matchDetails, participantName);
                 console.log(`   - Found Player ID by name: ${playerId}`);
             }
             
@@ -6736,7 +6736,7 @@ class BetOutcomeCalculator {
             // Find player ID
             let playerId = bet.participantId;
             if (!playerId && participantName) {
-                playerId = findPlayerIdByName(matchDetails, participantName);
+                playerId = await findPlayerIdByName(matchDetails, participantName);
             }
             
             if (!playerId) {
@@ -6825,7 +6825,7 @@ class BetOutcomeCalculator {
             // Find player ID
             let playerId = bet.participantId;
             if (!playerId && participantName) {
-                playerId = findPlayerIdByName(matchDetails, participantName);
+                playerId = await findPlayerIdByName(matchDetails, participantName);
             }
             
             if (!playerId) {
@@ -7981,7 +7981,7 @@ class BetOutcomeCalculator {
 
             // Step 5: Calculate bet outcome
             console.log(`\n🔍 STEP 5: Calculating bet outcome...`);
-            const outcome = this.calculateBetOutcome(bet, matchDetails);
+            const outcome = await this.calculateBetOutcome(bet, matchDetails);
 
             console.log(`📊 Outcome calculation:`);
             console.log(`   - Status: ${outcome.status}`);

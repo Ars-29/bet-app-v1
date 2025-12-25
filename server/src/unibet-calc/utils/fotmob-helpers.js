@@ -579,7 +579,7 @@ export function getPlayerStats(matchDetails, playerId) {
 }
 
 // Best-effort matcher from odds participant name to FotMob playerId
-export function findPlayerIdByName(matchDetails, participantName) {
+export async function findPlayerIdByName(matchDetails, participantName) {
     console.log(`🔍 findPlayerIdByName: Looking for "${participantName}"`);
     
     if (!matchDetails || !participantName) {
@@ -651,32 +651,82 @@ export function findPlayerIdByName(matchDetails, participantName) {
             : null);
     
     if (Array.isArray(globalShotmap)) {
-        const targetLower = target.toLowerCase();
+        let bestMatch = null;
+        let bestSimilarity = 0;
+        const SIMILARITY_THRESHOLD = 0.6;
+        
         for (const shot of globalShotmap) {
-            const shotPlayerName = normalize(shot?.playerName || '');
-            if (shotPlayerName === target || shotPlayerName.includes(target) || target.includes(shotPlayerName)) {
+            const shotPlayerName = shot?.playerName || '';
+            const shotPlayerNameNorm = normalize(shotPlayerName);
+            
+            // Exact match
+            if (shotPlayerNameNorm === target) {
                 const foundId = shot?.playerId || shot?.shotmapEvent?.playerId;
                 if (foundId) {
-                    console.log(`   ✅ Found in shotmap: "${shot.playerName}" (ID: ${foundId})`);
+                    console.log(`   ✅ Exact match in shotmap: "${shotPlayerName}" (ID: ${foundId})`);
                     return Number(foundId);
                 }
             }
+            
+            // Similarity-based match
+            const similarity = calculateNameSimilarity(participantName, shotPlayerName);
+            if (similarity >= SIMILARITY_THRESHOLD && similarity > bestSimilarity) {
+                bestSimilarity = similarity;
+                const foundId = shot?.playerId || shot?.shotmapEvent?.playerId;
+                if (foundId) {
+                    bestMatch = {
+                        id: Number(foundId),
+                        name: shotPlayerName,
+                        similarity: similarity
+                    };
+                    console.log(`   - Similarity match in shotmap: "${shotPlayerName}" (ID: ${foundId}, similarity: ${similarity.toFixed(3)})`);
+                }
+            }
+        }
+        
+        if (bestMatch) {
+            console.log(`   ✅ Using best shotmap match: "${bestMatch.name}" (ID: ${bestMatch.id}, similarity: ${bestMatch.similarity.toFixed(3)})`);
+            return bestMatch.id;
         }
     }
     
-    // Method 3: Check goal events by player name (as scorer)
+    // Method 3: Check goal events by player name (as scorer) using similarity
     console.log(`   - Checking goal events for player name (as scorer)...`);
     const homeGoals = matchDetails?.header?.events?.homeTeamGoals || {};
     const awayGoals = matchDetails?.header?.events?.awayTeamGoals || {};
     
+    let bestGoalMatch = null;
+    let bestGoalSimilarity = 0;
+    const SIMILARITY_THRESHOLD = 0.6;
+    
     // Check home team goals (keyed by player name)
     for (const [playerName, goals] of Object.entries(homeGoals)) {
-        if (normalize(playerName) === target || normalize(playerName).includes(target) || target.includes(normalize(playerName))) {
+        const playerNameNorm = normalize(playerName);
+        
+        // Exact match
+        if (playerNameNorm === target) {
             if (Array.isArray(goals) && goals.length > 0) {
                 const playerId = goals[0]?.playerId || goals[0]?.player?.id || goals[0]?.shotmapEvent?.playerId;
                 if (playerId) {
-                    console.log(`   ✅ Found in home goals: "${playerName}" (ID: ${playerId})`);
+                    console.log(`   ✅ Exact match in home goals: "${playerName}" (ID: ${playerId})`);
                     return Number(playerId);
+                }
+            }
+        }
+        
+        // Similarity-based match
+        const similarity = calculateNameSimilarity(participantName, playerName);
+        if (similarity >= SIMILARITY_THRESHOLD && similarity > bestGoalSimilarity) {
+            if (Array.isArray(goals) && goals.length > 0) {
+                const playerId = goals[0]?.playerId || goals[0]?.player?.id || goals[0]?.shotmapEvent?.playerId;
+                if (playerId) {
+                    bestGoalSimilarity = similarity;
+                    bestGoalMatch = {
+                        id: Number(playerId),
+                        name: playerName,
+                        similarity: similarity
+                    };
+                    console.log(`   - Similarity match in home goals: "${playerName}" (ID: ${playerId}, similarity: ${similarity.toFixed(3)})`);
                 }
             }
         }
@@ -684,15 +734,40 @@ export function findPlayerIdByName(matchDetails, participantName) {
     
     // Check away team goals
     for (const [playerName, goals] of Object.entries(awayGoals)) {
-        if (normalize(playerName) === target || normalize(playerName).includes(target) || target.includes(normalize(playerName))) {
+        const playerNameNorm = normalize(playerName);
+        
+        // Exact match
+        if (playerNameNorm === target) {
             if (Array.isArray(goals) && goals.length > 0) {
                 const playerId = goals[0]?.playerId || goals[0]?.player?.id || goals[0]?.shotmapEvent?.playerId;
                 if (playerId) {
-                    console.log(`   ✅ Found in away goals: "${playerName}" (ID: ${playerId})`);
+                    console.log(`   ✅ Exact match in away goals: "${playerName}" (ID: ${playerId})`);
                     return Number(playerId);
                 }
             }
         }
+        
+        // Similarity-based match
+        const similarity = calculateNameSimilarity(participantName, playerName);
+        if (similarity >= SIMILARITY_THRESHOLD && similarity > bestGoalSimilarity) {
+            if (Array.isArray(goals) && goals.length > 0) {
+                const playerId = goals[0]?.playerId || goals[0]?.player?.id || goals[0]?.shotmapEvent?.playerId;
+                if (playerId) {
+                    bestGoalSimilarity = similarity;
+                    bestGoalMatch = {
+                        id: Number(playerId),
+                        name: playerName,
+                        similarity: similarity
+                    };
+                    console.log(`   - Similarity match in away goals: "${playerName}" (ID: ${playerId}, similarity: ${similarity.toFixed(3)})`);
+                }
+            }
+        }
+    }
+    
+    if (bestGoalMatch) {
+        console.log(`   ✅ Using best goal match: "${bestGoalMatch.name}" (ID: ${bestGoalMatch.id}, similarity: ${bestGoalMatch.similarity.toFixed(3)})`);
+        return bestGoalMatch.id;
     }
     
     // Method 4: Check assists in goal events (player might have assists but no goals)
@@ -739,6 +814,22 @@ export function findPlayerIdByName(matchDetails, participantName) {
     }
     
     console.log(`   ❌ Could not find player "${participantName}" in any source`);
+    
+    // Method 5: Fallback to Gemini AI when all methods fail
+    // Only use Gemini if similarity was too low or player not found
+    console.log(`   🤖 Attempting Gemini AI fallback...`);
+    try {
+        const { findPlayerWithGemini } = await import('./gemini-player-matcher.js');
+        const geminiPlayerId = await findPlayerWithGemini(matchDetails, participantName);
+        if (geminiPlayerId) {
+            console.log(`   ✅ Gemini found player ID: ${geminiPlayerId}`);
+            return geminiPlayerId;
+        }
+    } catch (geminiError) {
+        console.log(`   ⚠️ Gemini fallback failed: ${geminiError.message}`);
+        // Continue to return null
+    }
+    
     return null;
 }
 
