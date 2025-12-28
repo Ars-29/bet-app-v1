@@ -29,9 +29,18 @@ const UNIBET_HEADERS = {
 
 // Create axios instance for direct Unibet API calls (from browser)
 const unibetDirectClient = axios.create({
-  timeout: 30000, // Increased to 30 seconds to handle slow Next.js API route (Unibet API + extraction + filtering)
+  timeout: 1500, // 1.5 seconds timeout - optimized for faster response (live matches)
   headers: UNIBET_HEADERS
 });
+
+// ✅ NEW: Separate axios instance for betoffers (needs more time for complex data)
+const unibetBetOffersClient = axios.create({
+  timeout: 3000, // 3 seconds timeout for betoffers (more complex data, matches API route timeout)
+  headers: UNIBET_HEADERS
+});
+
+// Request deduplication - prevent multiple simultaneous requests
+let pendingLiveMatchesRequest = null;
 
 class UnibetDirectService {
   /**
@@ -45,7 +54,8 @@ class UnibetDirectService {
       
       // Use Next.js API route as proxy (handles CORS)
       const url = `${NEXT_API_BETOFFERS}/${eventId}`;
-      const response = await unibetDirectClient.get(url);
+      // ✅ Use betoffers client with higher timeout (3s) to match API route
+      const response = await unibetBetOffersClient.get(url);
       
       console.log(`✅ [NEXT PROXY] Successfully fetched bet offers for event: ${eventId}`);
       
@@ -85,38 +95,65 @@ class UnibetDirectService {
    * @returns {Promise} - Live matches data from Unibet API
    */
   async getLiveMatches() {
-    try {
-      console.log(`🔍 [NEXT PROXY] Fetching live matches via Next.js API proxy...`);
-      
-      // Use Next.js API route as proxy (handles CORS)
-      const url = `${NEXT_API_LIVE_MATCHES}?force=true`;
-      const response = await unibetDirectClient.get(url);
-      
-      console.log(`✅ [NEXT PROXY] Successfully fetched live matches`);
-      
-      // Next.js API route returns: { success, matches, allMatches, upcomingMatches, totalMatches, ... }
-      // Return the response data directly (not nested in "data" field)
-      const result = {
-        success: response.data.success,
-        matches: response.data.matches || [],
-        allMatches: response.data.allMatches || [],
-        upcomingMatches: response.data.upcomingMatches || [],
-        totalMatches: response.data.totalMatches || 0,
-        totalAllMatches: response.data.totalAllMatches || 0,
-        lastUpdated: response.data.lastUpdated || response.data.timestamp || new Date().toISOString(),
-        source: response.data.source || 'unibet-proxy-nextjs'
-      };
-      
-      return result;
-    } catch (error) {
-      console.error(`❌ [NEXT PROXY] Error fetching live matches:`, error);
-      throw new Error(
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        'Failed to fetch live matches from Unibet'
-      );
+    // Request deduplication: If a request is already in progress, wait for it
+    if (pendingLiveMatchesRequest) {
+      console.log(`⏳ [NEXT PROXY] Request already in progress, waiting...`);
+      try {
+        return await pendingLiveMatchesRequest;
+      } catch (error) {
+        // If pending request fails, continue with new request
+        pendingLiveMatchesRequest = null;
+      }
     }
+    
+    // Create new request promise
+    pendingLiveMatchesRequest = (async () => {
+      try {
+        console.log(`🔍 [NEXT PROXY] Fetching live matches via Next.js API proxy...`);
+        
+        // Use Next.js API route as proxy (handles CORS)
+        const url = `${NEXT_API_LIVE_MATCHES}?force=true`;
+        const response = await unibetDirectClient.get(url);
+        
+        console.log(`✅ [NEXT PROXY] Successfully fetched live matches`);
+        
+        // Next.js API route returns: { success, matches, allMatches, upcomingMatches, totalMatches, ... }
+        // Return the response data directly (not nested in "data" field)
+        const result = {
+          success: response.data.success,
+          matches: response.data.matches || [],
+          allMatches: response.data.allMatches || [],
+          upcomingMatches: response.data.upcomingMatches || [],
+          totalMatches: response.data.totalMatches || 0,
+          totalAllMatches: response.data.totalAllMatches || 0,
+          lastUpdated: response.data.lastUpdated || response.data.timestamp || new Date().toISOString(),
+          source: response.data.source || 'unibet-proxy-nextjs'
+        };
+        
+        // Clear pending request on success
+        pendingLiveMatchesRequest = null;
+        return result;
+      } catch (error) {
+        // Clear pending request on error
+        pendingLiveMatchesRequest = null;
+        
+        // Handle timeout errors gracefully - return null for silent updates
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
+          console.warn(`⏱️ [NEXT PROXY] Request timeout - will retry on next poll`);
+          return null; // Return null so silent updates can handle it gracefully
+        }
+        
+        console.error(`❌ [NEXT PROXY] Error fetching live matches:`, error);
+        throw new Error(
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          error.message ||
+          'Failed to fetch live matches from Unibet'
+        );
+      }
+    })();
+    
+    return pendingLiveMatchesRequest;
   }
 
   /**

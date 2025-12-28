@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchLiveMatches, silentUpdateLiveMatches, selectLiveMatchesGrouped, selectLiveMatchesLoading, selectLiveMatchesError } from '@/lib/features/matches/liveMatchesSlice';
+import { fetchLiveMatches, silentUpdateLiveMatches, selectLiveMatchesGrouped, selectLiveMatchesLoading, selectLiveMatchesError, fetchBetOffersForLiveMatches } from '@/lib/features/matches/liveMatchesSlice';
 import MatchListPage from '@/components/shared/MatchListPage';
 import LiveTimer from '@/components/home/LiveTimer';
 import { getFotmobLogoByUnibetId } from '@/lib/leagueUtils';
@@ -14,27 +14,42 @@ const InPlayPage = () => {
     const error = useSelector(selectLiveMatchesError);
     const dispatch = useDispatch();
     const pollingIntervalRef = useRef(null);
+    // Get matchBetOffers for deduplication
+    const matchBetOffers = useSelector(state => state.liveMatches.matchBetOffers);
     
     // Initial data fetch
     useEffect(() => {
-        dispatch(fetchLiveMatches());
-    }, [dispatch]);
+        dispatch(fetchLiveMatches()).then((result) => {
+            // After live matches update, fetch betoffers ONLY for visible matches (first 8)
+            // Don't fetch all matches - too expensive and causes 6-7 second delay
+            if (result.payload && result.payload.matches) {
+                const visibleMatchIds = result.payload.matches
+                    .slice(0, 8)
+                    .map(m => m.id)
+                    .filter(id => !matchBetOffers[id]); // Deduplication
+                
+                if (visibleMatchIds.length > 0) {
+                    dispatch(fetchBetOffersForLiveMatches(visibleMatchIds));
+                }
+            }
+        });
+    }, [dispatch, matchBetOffers]);
 
-    // Set up polling for live matches data (500ms for ultra real-time updates)
+    // Set up polling for live matches data (200ms for ultra real-time updates)
     useEffect(() => {
-        // Start polling every 500ms for live matches (ultra real-time data requirement)
+        // Start polling every 200ms for live matches (ultra real-time data requirement)
         const startPolling = () => {
             pollingIntervalRef.current = setInterval(() => {
                 if (typeof document !== 'undefined' && document.hidden) return; // pause when tab hidden
                 console.log('🔄 In-Play page polling live matches data...');
                 dispatch(silentUpdateLiveMatches());
-            }, 500); // Poll every 500ms for ultra real-time odds updates
+                // NOTE: Don't fetch betoffers every 200ms - too expensive! Use mainBetOffer for real-time updates
+                // Betoffers are fetched once on initial load, then use mainBetOffer for real-time updates
+            }, 200); // Poll every 200ms for ultra real-time odds updates (using mainBetOffer from live matches API)
         };
 
-        // Start polling after initial load
-        const timeoutId = setTimeout(() => {
-            startPolling();
-        }, 1000); // Wait 1 second after initial load
+        // Start polling immediately (no delay)
+        startPolling();
 
         // Cleanup function
         return () => {
@@ -42,7 +57,6 @@ const InPlayPage = () => {
                 clearInterval(pollingIntervalRef.current);
                 pollingIntervalRef.current = null;
             }
-            clearTimeout(timeoutId);
         };
     }, [dispatch]);
 
@@ -62,7 +76,8 @@ const InPlayPage = () => {
                     pollingIntervalRef.current = setInterval(() => {
                         console.log('🔄 In-Play page resuming live matches polling...');
                         dispatch(silentUpdateLiveMatches());
-                    }, 500); // 500ms polling interval for ultra real-time updates
+                        // NOTE: Don't fetch betoffers every 300ms - too expensive! Use mainBetOffer for real-time updates
+                    }, 200); // 200ms polling interval for ultra real-time updates (using mainBetOffer from live matches API)
                     console.log('▶️ In-Play page polling resumed - tab visible');
                 }
             }

@@ -6,7 +6,7 @@ import TopPicks from './TopPicks';
 import LiveMatches from './LiveMatches';
 import LeagueCards from './LeagueCards';
 import { fetchHomepageData, selectHomeLoading, selectHomeError, selectFootballDaily } from '@/lib/features/home/homeSlice';
-import { fetchLiveMatches, silentUpdateLiveMatches, selectLiveMatches, selectUpcomingMatchesGrouped } from '@/lib/features/matches/liveMatchesSlice';
+import { fetchLiveMatches, silentUpdateLiveMatches, selectLiveMatches, selectUpcomingMatchesGrouped, fetchBetOffersForLiveMatches } from '@/lib/features/matches/liveMatchesSlice';
 
 const HomePage = () => {
     const dispatch = useDispatch();
@@ -26,28 +26,44 @@ const HomePage = () => {
     // Ref for polling interval
     const pollingIntervalRef = useRef(null);
 
+    // Get matchBetOffers for deduplication
+    const matchBetOffers = useSelector(state => state.liveMatches.matchBetOffers);
+
     // Initial data fetch
     useEffect(() => {
         // Fetch homepage data when component mounts
         dispatch(fetchHomepageData());
         // Fetch live matches from Unibet API
-        dispatch(fetchLiveMatches());
-    }, [dispatch]);
+        dispatch(fetchLiveMatches()).then((result) => {
+            // After live matches update, fetch betoffers ONLY for visible matches (first 8)
+            // Don't fetch all matches - too expensive and causes 6-7 second delay
+            if (result.payload && result.payload.matches) {
+                const visibleMatchIds = result.payload.matches
+                    .slice(0, 8)
+                    .map(m => m.id)
+                    .filter(id => !matchBetOffers[id]); // Deduplication
+                
+                if (visibleMatchIds.length > 0) {
+                    dispatch(fetchBetOffersForLiveMatches(visibleMatchIds));
+                }
+            }
+        });
+    }, [dispatch, matchBetOffers]);
 
-    // Set up polling for live matches data (500ms for ultra real-time updates)
+    // Set up polling for live matches data (200ms for ultra real-time updates)
     useEffect(() => {
-        // Start polling every 500ms for live matches (ultra real-time data requirement)
+        // Start polling every 200ms for live matches (ultra real-time data requirement)
         const startPolling = () => {
             pollingIntervalRef.current = setInterval(() => {
                 if (typeof document !== 'undefined' && document.hidden) return; // pause when tab hidden
                 dispatch(silentUpdateLiveMatches());
-            }, 500); // Poll every 500ms for ultra real-time odds updates
+                // NOTE: Don't fetch betoffers every 200ms - too expensive! Use mainBetOffer for real-time updates
+                // Betoffers are fetched once on initial load, then use mainBetOffer for real-time updates
+            }, 200); // Poll every 200ms for ultra real-time odds updates (using mainBetOffer from live matches API)
         };
 
-        // Start polling after initial load
-        const timeoutId = setTimeout(() => {
-            startPolling();
-        }, 1000); // Wait 1 second after initial load
+        // Start polling immediately (no delay)
+        startPolling();
 
         // Cleanup function
         return () => {
@@ -55,7 +71,6 @@ const HomePage = () => {
                 clearInterval(pollingIntervalRef.current);
                 pollingIntervalRef.current = null;
             }
-            clearTimeout(timeoutId);
         };
     }, [dispatch]);
 
@@ -73,7 +88,7 @@ const HomePage = () => {
                 if (!pollingIntervalRef.current) {
                     pollingIntervalRef.current = setInterval(() => {
                         dispatch(silentUpdateLiveMatches());
-                    }, 500); // 500ms polling interval for ultra real-time updates
+                    }, 200); // 200ms polling interval for ultra real-time updates
                 }
             }
         };

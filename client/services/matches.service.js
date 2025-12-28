@@ -137,6 +137,12 @@ class MatchesService {
       // ✅ DIRECT CALL: Frontend → Unibet API (no backend)
       const data = await unibetDirectService.getLiveMatches();
       
+      // Handle timeout/null response gracefully
+      if (!data) {
+        console.warn('⚠️ [DIRECT] getLiveMatches returned null (likely timeout)');
+        return null; // Return null for silent updates to handle gracefully
+      }
+      
       if (data.success) {
         console.log(`✅ [NEXT PROXY] Successfully fetched live matches (source: ${data.source})`);
         
@@ -156,6 +162,12 @@ class MatchesService {
         throw new Error(data.message || 'Failed to fetch live matches');
       }
     } catch (error) {
+      // For timeout errors, return null instead of throwing
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.message?.includes('aborted')) {
+        console.warn('⏱️ [DIRECT] Request timeout - will retry on next poll');
+        return null;
+      }
+      
       console.error('❌ [DIRECT] Error fetching live matches:', error);
       throw new Error(
         error.response?.data?.message ||

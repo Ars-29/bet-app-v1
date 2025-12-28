@@ -53,15 +53,15 @@ app.use(
       if (!origin) return callback(null, true);
       
       const allowedOrigins = [
-        process.env.CLIENT_URL || "http://localhost:3000",
-        "http://69.197.164.180:3000",
-        "http://69.197.164.180",
-        "https://betting-website-tau.vercel.app",
-        "https://betting-website-tau.vercel.app/",
-        "https://betting-app-gules.vercel.app",
-        "https://betting-app-gules.vercel.app/",
-        "https://betting-gyfbehjhc-hassaan-2223s-projects.vercel.app",
-        "https://betting-gyfbehjhc-hassaan-2223s-projects.vercel.app/",
+      process.env.CLIENT_URL || "http://localhost:3000",
+      "http://69.197.164.180:3000",
+      "http://69.197.164.180",
+      "https://betting-website-tau.vercel.app",
+      "https://betting-website-tau.vercel.app/",
+      "https://betting-app-gules.vercel.app",
+      "https://betting-app-gules.vercel.app/",
+      "https://betting-gyfbehjhc-hassaan-2223s-projects.vercel.app",
+      "https://betting-gyfbehjhc-hassaan-2223s-projects.vercel.app/",
         // ✅ NEW VERCEL DEPLOYMENT
         "https://bet-app-v1-qtnw.vercel.app",
         "https://bet-app-v1-qtnw.vercel.app/",

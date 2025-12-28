@@ -770,14 +770,14 @@ export const setupAgendaListeners = () => {
     });
   } else {
     // Wait for ready event
-    agenda.on("ready", () => {
+  agenda.on("ready", () => {
       console.log("[Agenda] ✅ Ready and connected to MongoDB");
       console.log("[Agenda] 🚀 Initializing agenda jobs...");
-      // Initialize agenda after agenda is ready
+    // Initialize agenda after agenda is ready
       initializeAgendaJobs().catch(error => {
         console.error('[Agenda] ❌ Error initializing agenda jobs:', error);
       });
-    });
+  });
   }
 
   agenda.on("error", (err) => {

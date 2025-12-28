@@ -1,4 +1,6 @@
 // Next.js API Route - Proxy for Unibet Live Matches API (handles CORS)
+// Note: Cannot use Edge runtime due to fs dependency in leagueFilter.js
+// Optimized for speed with parallel processing and minimal buffering
 // Same extraction and filtering logic as backend server/src/routes/unibet-api/live-matches.js
 import { NextResponse } from 'next/server';
 import { filterMatchesByAllowedLeagues, getLeagueFilterStats } from '@/lib/utils/leagueFilter.js';
@@ -25,7 +27,7 @@ let cache = {
   isRefreshing: false
 };
 
-const CACHE_DURATION = 500; // 500ms cache to prevent duplicate requests while allowing real-time updates
+const CACHE_DURATION = 0; // No cache - always fetch fresh data for real-time updates
 
 // Helper function to extract football matches (SAME AS BACKEND - exact copy)
 function extractFootballMatches(data) {
@@ -227,7 +229,7 @@ async function fetchKambiLiveData() {
     
     const response = await fetch(url, {
       headers: KAMBI_LIVE_HEADERS,
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      signal: AbortSignal.timeout(1000) // 1 second timeout for Kambi (faster response)
     });
     
     if (!response.ok) {
@@ -321,17 +323,24 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const force = searchParams.get('force') === 'true';
     
-    // Return cached data if available and fresh (unless force refresh)
-    if (!force && cache.data && cache.lastUpdated && 
-        Date.now() - cache.lastUpdated < CACHE_DURATION) {
-      console.log(`📦 [NEXT API] Returning cached data (age: ${Date.now() - cache.lastUpdated}ms)`);
-      return NextResponse.json(cache.data);
-    }
+    // Skip cache completely for real-time updates (always fetch fresh)
+    // Cache only used for request deduplication, not for data freshness
     
-    // If already refreshing, return stale cache (prevents duplicate requests)
-    if (cache.isRefreshing && cache.data) {
-      console.log(`⏳ [NEXT API] Request already in progress, returning stale cache`);
-      return NextResponse.json(cache.data);
+    // If already refreshing, wait for the current request instead of returning stale cache
+    // This prevents flickering from stale data
+    if (cache.isRefreshing) {
+      // Wait for current request to complete (max 3 seconds)
+      const maxWait = 3000;
+      const startWait = Date.now();
+      while (cache.isRefreshing && (Date.now() - startWait) < maxWait) {
+        await new Promise(resolve => setTimeout(resolve, 50)); // Check every 50ms
+      }
+      // If cache was updated, return fresh data
+      if (cache.data && cache.lastUpdated && Date.now() - cache.lastUpdated < CACHE_DURATION) {
+        console.log(`✅ [NEXT API] Returning fresh data after waiting for previous request`);
+        return NextResponse.json(cache.data);
+      }
+      // If still refreshing or stale, continue with new request
     }
     
     // Mark as refreshing
@@ -349,7 +358,8 @@ export async function GET(request) {
         'priority': 'u=1, i',
         'referer': 'https://www.unibet.com.au/betting/sports/filter/football/all/matches',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
-      }
+      },
+      signal: AbortSignal.timeout(1500) // 1.5 seconds timeout - optimized for faster response
     });
     
     if (!response.ok) {
@@ -363,23 +373,46 @@ export async function GET(request) {
     // Extract and filter matches (SAME LOGIC AS BACKEND)
     const { allMatches, liveMatches, upcomingMatches } = extractFootballMatches(data);
     
-    // Fetch Kambi live data (score, matchClock, statistics) for live matches
-    console.log('🎲 [NEXT API] Fetching Kambi live data to enrich matches...');
-    const kambiData = await fetchKambiLiveData();
-    const liveDataMap = extractKambiLiveData(kambiData);
+    // ✅ OPTIMIZATION: Try to get Kambi data quickly (race condition)
+    // If Kambi completes in < 1s, merge it. Otherwise return without it.
+    console.log('🎲 [NEXT API] Fetching Kambi live data (fast race)...');
+    const kambiPromise = fetchKambiLiveData().catch(err => {
+      console.warn('⚠️ [NEXT API] Kambi fetch failed:', err.message);
+      return null;
+    });
     
-    // Merge Kambi live data with live matches
-    const enrichedLiveMatches = mergeKambiLiveDataWithMatches(liveMatches, liveDataMap);
+    // Race: Wait max 1 second for Kambi, then return matches
+    let enrichedLiveMatches = liveMatches;
+    let liveDataMap = {};
+    
+    try {
+      const kambiData = await Promise.race([
+        kambiPromise,
+        new Promise((resolve) => setTimeout(() => resolve(null), 1000)) // 1s timeout for Kambi
+      ]);
+      
+      if (kambiData) {
+        liveDataMap = extractKambiLiveData(kambiData);
+        enrichedLiveMatches = mergeKambiLiveDataWithMatches(liveMatches, liveDataMap);
+        console.log(`✨ [NEXT API] Kambi data merged quickly (${Object.keys(liveDataMap).length} matches)`);
+      } else {
+        console.log(`⏱️ [NEXT API] Kambi data not ready in time, returning without it (will update in background)`);
+      }
+    } catch (error) {
+      console.warn('⚠️ [NEXT API] Kambi data fetch failed, continuing without it');
+    }
     
     // Prepare response data
+    const responseTimestamp = Date.now(); // Numeric timestamp for millisecond-precision comparison
     const responseData = {
       success: true,
-      matches: enrichedLiveMatches,
+      matches: enrichedLiveMatches, // May or may not have Kambi data
       allMatches: allMatches,
       upcomingMatches: upcomingMatches,
       totalMatches: enrichedLiveMatches.length,
       totalAllMatches: allMatches.length,
       lastUpdated: new Date().toISOString(),
+      timestamp: responseTimestamp, // Numeric timestamp for millisecond-precision comparison
       source: 'unibet-proxy-nextjs',
       debug: {
         totalEventsFound: allMatches.length,
@@ -389,19 +422,54 @@ export async function GET(request) {
       }
     };
     
-    // Update cache
+    // Update cache immediately
     cache.data = responseData;
     cache.lastUpdated = Date.now();
     cache.isRefreshing = false;
     
-    console.log(`✅ [NEXT API] Cache updated (${allMatches.length} matches)`);
+    // Continue fetching Kambi in background for next request (if not already done)
+    if (Object.keys(liveDataMap).length === 0) {
+      kambiPromise.then(kambiData => {
+        if (kambiData) {
+          const bgLiveDataMap = extractKambiLiveData(kambiData);
+          const bgEnrichedMatches = mergeKambiLiveDataWithMatches(liveMatches, bgLiveDataMap);
+          
+          // Update cache with enriched data (for next request)
+          cache.data = {
+            ...responseData,
+            matches: bgEnrichedMatches,
+            debug: {
+              ...responseData.debug,
+              kambiLiveDataCount: Object.keys(bgLiveDataMap).length
+            }
+          };
+          cache.lastUpdated = Date.now();
+          console.log(`✨ [NEXT API] Kambi data merged in background (${Object.keys(bgLiveDataMap).length} matches enriched)`);
+        }
+      }).catch(() => {
+        // Ignore errors
+      });
+    }
     
-    return NextResponse.json(responseData);
+    console.log(`✅ [NEXT API] Returning matches (${liveMatches.length} matches, ${Object.keys(liveDataMap).length} with Kambi data)`);
+    
+    // Return response
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'X-Response-Source': 'nodejs-optimized-fast'
+      }
+    });
   } catch (error) {
     // Mark as not refreshing on error
     cache.isRefreshing = false;
     
     console.error(`❌ [NEXT API] Error proxying Unibet live matches:`, error);
+    console.error(`❌ [NEXT API] Error details:`, {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     
     // Return cached data if available (even if stale) on error
     if (cache.data) {
@@ -409,11 +477,13 @@ export async function GET(request) {
       return NextResponse.json(cache.data);
     }
     
+    // Return error response with proper status
     return NextResponse.json(
       {
         success: false,
         error: error.message || 'Failed to fetch live matches',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }
     );

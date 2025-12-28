@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSelector, useDispatch } from 'react-redux';
 import LiveMatchCard from './LiveMatchCard';
 import TopPicksSkeleton from '../Skeletons/TopPicksSkeleton';
-import { selectLiveMatchesRaw, selectLiveMatchesLoading, selectLiveMatchesWarning, selectLiveMatchesCacheAge, fetchLiveMatches, silentUpdateLiveMatches } from '@/lib/features/matches/liveMatchesSlice';
+import { selectLiveMatchesRaw, selectLiveMatchesLoading, selectLiveMatchesWarning, selectLiveMatchesCacheAge, silentUpdateLiveMatches, fetchBetOffersForLiveMatches, selectMatchBetOffers } from '@/lib/features/matches/liveMatchesSlice';
 import { getFotmobLogoByUnibetId } from '@/lib/leagueUtils';
 import { useLiveOddsSync } from '@/hooks/useLiveOddsSync';
 
@@ -16,15 +16,59 @@ const LiveMatchWithSync = ({ match }) => {
 };
 
 // Helper function to transform Unibet API data to MatchCard format
-const transformLiveMatchData = (apiMatch) => {
+// Updated to use betoffers (exactly like match details page)
+const transformLiveMatchData = (apiMatch, betOffers) => {
     // Extract team names from the match data
     const homeTeam = apiMatch.homeName || apiMatch.participants?.find(p => p.position === 'home')?.name || 'Home Team';
     const awayTeam = apiMatch.awayName || apiMatch.participants?.find(p => p.position === 'away')?.name || 'Away Team';
     
-    // Extract odds from liveOdds (new Kambi API integration)
+    // Extract odds - Priority 1: Use betoffers (exactly like match details page)
     const odds = {};
     
-    if (apiMatch.liveOdds && apiMatch.liveOdds.outcomes) {
+    // Priority 1: Use betoffers (exactly like match details page)
+    if (betOffers && betOffers.length > 0) {
+        // Find Full Time Result market (marketId: 1 or criterion.label)
+        const fullTimeResultMarket = betOffers.find(offer => 
+            offer.criterion?.label === 'Full Time Result' ||
+            offer.criterion?.englishLabel === 'Full Time Result' ||
+            offer.betOfferType?.name === 'Full Time Result' ||
+            offer.marketId === 1
+        );
+        
+        if (fullTimeResultMarket && fullTimeResultMarket.outcomes) {
+            fullTimeResultMarket.outcomes.forEach(outcome => {
+                const label = outcome.label?.toString().toLowerCase();
+                const value = parseFloat(outcome.odds);
+                
+                if (!isNaN(value)) {
+                    const convertedValue = (value / 1000).toFixed(2);
+                    
+                    if (label === '1' || label === 'home') {
+                        odds['1'] = { 
+                            value: convertedValue, 
+                            oddId: outcome.id,
+                            status: outcome.status || 'OPEN'
+                        };
+                    } else if (label === 'x' || label === 'draw') {
+                        odds['X'] = { 
+                            value: convertedValue, 
+                            oddId: outcome.id,
+                            status: outcome.status || 'OPEN'
+                        };
+                    } else if (label === '2' || label === 'away') {
+                        odds['2'] = { 
+                            value: convertedValue, 
+                            oddId: outcome.id,
+                            status: outcome.status || 'OPEN'
+                        };
+                    }
+                }
+            });
+        }
+    }
+    
+    // Priority 2: Extract odds from liveOdds (new Kambi API integration)
+    if (Object.keys(odds).length === 0 && apiMatch.liveOdds && apiMatch.liveOdds.outcomes) {
         apiMatch.liveOdds.outcomes.forEach(outcome => {
             const label = outcome.label?.toString().toLowerCase();
             const value = parseFloat(outcome.odds);
@@ -155,17 +199,36 @@ const LiveMatches = () => {
     const loading = useSelector(selectLiveMatchesLoading);
     const warning = useSelector(selectLiveMatchesWarning);
     const cacheAge = useSelector(selectLiveMatchesCacheAge);
+    // Get betoffers from Redux state (exactly like match details page) - MUST be before any conditional returns
+    const matchBetOffers = useSelector(state => state.liveMatches.matchBetOffers);
 
-
-    // Auto-refresh live odds every 500ms for ultra real-time updates
+    // Fetch betoffers ONLY for visible matches (first 8) - reduces initial load time
+    // Matches show immediately with mainBetOffer odds, betoffers fetch in background
     useEffect(() => {
-        // Initial fetch with loading state
-        dispatch(fetchLiveMatches());
-        
-        // Set up interval to refresh every 500ms with silent updates (ultra real-time data requirement)
+        if (liveMatchesData && liveMatchesData.length > 0) {
+            // Only fetch betoffers for visible matches (first 8) to reduce load time
+            const visibleMatchIds = liveMatchesData
+                .slice(0, 8)
+                .map(match => match.id)
+                .filter(id => !matchBetOffers[id]); // Don't refetch if already fetched (deduplication)
+            
+            if (visibleMatchIds.length > 0) {
+                console.log(`🔍 [BETOFFERS] Fetching betoffers for ${visibleMatchIds.length} visible matches...`);
+                dispatch(fetchBetOffersForLiveMatches(visibleMatchIds));
+            }
+        }
+    }, [liveMatchesData, matchBetOffers, dispatch]);
+
+    // Set up polling for live matches data (200ms for ultra real-time updates)
+    // NOTE: fetchLiveMatches() is already called in HomePage.jsx - no need to duplicate here
+    // This prevents double API calls and reduces initial load delay
+    useEffect(() => {
+        // Set up interval to refresh every 200ms with silent updates
+        // NOTE: Don't fetch betoffers every 200ms - too expensive! Use mainBetOffer for real-time updates
         const refreshInterval = setInterval(() => {
             dispatch(silentUpdateLiveMatches());
-        }, 500); // 500ms for ultra real-time odds updates
+            // Betoffers are fetched once on initial load, then use mainBetOffer for real-time updates
+        }, 200); // 200ms for ultra real-time odds updates (using mainBetOffer from live matches API)
 
         // Cleanup interval on unmount
         return () => {
@@ -178,10 +241,14 @@ const LiveMatches = () => {
     if (loading) {
         return <TopPicksSkeleton />;
     }
-
+    
     // Transform API data to MatchCard format - show all live matches regardless of odds
+    // Use betoffers from Redux state (exactly like match details page)
     const transformedMatches = liveMatchesData
-        .map(match => transformLiveMatchData(match))
+        .map(match => {
+            const betOffers = matchBetOffers[match.id];
+            return transformLiveMatchData(match, betOffers);
+        })
         .filter(match => {
             // Filter out matches above 90 minutes with all odds disabled
             if (match.kambiLiveData?.matchClock) {

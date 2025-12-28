@@ -1,4 +1,7 @@
-// Next.js API Route - Proxy for Unibet Bet Offers API (handles CORS)
+// Next.js Edge API Route - Ultra-fast proxy for Unibet Bet Offers API (handles CORS)
+// Edge runtime for near-zero latency
+export const runtime = 'edge';
+
 import { NextResponse } from 'next/server';
 
 const UNIBET_BETOFFERS_API = 'https://oc-offering-api.kambicdn.com/offering/v2018/ubau/betoffer/event';
@@ -37,7 +40,8 @@ export async function GET(request, { params }) {
             'priority': 'u=1, i',
             'referer': 'https://www.unibet.com.au/',
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
-          }
+          },
+          signal: AbortSignal.timeout(2500) // 2.5 seconds timeout - balanced for real-time updates
         });
         break; // Success, exit retry loop
       } catch (error) {
@@ -75,12 +79,18 @@ export async function GET(request, { params }) {
     
     console.log(`✅ [NEXT API] Successfully proxied Unibet bet offers for event: ${eventId}`);
     
+    // Return with streaming-friendly response
     return NextResponse.json({
       success: true,
       eventId,
       data: data,
       timestamp: new Date().toISOString(),
-      source: 'unibet-proxy-nextjs'
+      source: 'unibet-proxy-edge'
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'X-Edge-Runtime': 'true'
+      }
     });
   } catch (error) {
     console.error(`❌ [NEXT API] Error proxying Unibet bet offers:`, error);
